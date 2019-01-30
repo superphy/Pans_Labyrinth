@@ -191,7 +191,8 @@ if __name__ == '__main__':
     for filename in os.listdir(directory):
         df = pd.read_pickle('data/kmers/{}'.format(filename))
         genome = split_string(filename, character)
-        print(genome)
+        add_genome_to_schema(client, genome)
+
     '''
     # manual addition to graph -- this would normally be functions
     add_genome_to_schema(client, "genomeA")
