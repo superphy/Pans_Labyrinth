@@ -1,7 +1,4 @@
 #!/usr/bin/env python
-import pandas as pd
-import os
-from functions import *
 
 """
 This is a simple example, using the layout of
@@ -11,6 +8,12 @@ We have modified it for genome kmers
 
 import pydgraph
 import json
+import tempfile
+import subprocess
+import timeit
+import os
+import pandas as pd
+from functions import *
 
 
 def create_client_stub():
@@ -59,13 +62,14 @@ def set_schema(client):
     return client.alter(pydgraph.Operation(schema=schema))
 
 
-def add_kmer_to_graph(client, ki, kn, genome):
+def add_kmer_to_graph(client, ki, kn, genome, bulk=False):
     """
     Every kmer needs to be linked to another kmer. Single kmers not permitted.
     :param client: dgraph client
     :param ki: the initial kmer. Get the uid if it exists. Otherwise create it.
     :param kn: the next kmer, linked to ki. Get the uid if it exists. Otherwise create it.
     :param genome: the genome label between the two kmers -- this needs to be previously indexed in the schema.
+    :param bulk: delay the insertion of the data, instead return a list of triples to be live-loaded
     :return: None
     """
 
@@ -75,23 +79,22 @@ def add_kmer_to_graph(client, ki, kn, genome):
     uid_ki = kmer_upsert(client, ki)
     uid_kn = kmer_upsert(client, kn)
 
-    #start the transaction
-    txn = client.txn()
+    # Data to be inserted
+    d = "<{0}> <{1}> <{2}> .".format(uid_ki, genome, uid_kn)
 
-    # The two kmers (as nodes) are linked by a <genome name> predicate
-    try:
-        d = {
-            'uid': uid_ki,
-            genome: {
-                'uid': uid_kn
-            }
-        }
-        txn.mutate(set_obj=d)
-        txn.commit()
+    if not bulk:
+        # start the transaction
+        txn = client.txn()
 
-    finally:
-        txn.discard()
+        # The two kmers (as nodes) are linked by a <genome name> predicate
+        try:
+            txn.mutate(set_nquads=d)
+            txn.commit()
 
+        finally:
+            txn.discard()
+    else:
+        return d
 
 def kmer_upsert(client, kmer):
     """
@@ -109,9 +112,12 @@ def kmer_upsert(client, kmer):
         txn = client.txn()
 
         try:
-            # The data we wish to add
-            d = {'kmer': kmer}
-            m = txn.mutate(set_obj=d)
+            # The data we wish to add in triple form
+            d = """
+                    _:blank-0 <kmer> "{0}" .
+            """.format(kmer)
+
+            m = txn.mutate(set_nquads=d)
             txn.commit()
             uid = m.uids['blank-0']
 
@@ -157,10 +163,40 @@ def example_query(client, genome):
     """
 
     # Transaction for the query
-    query = "{test(func: has(" + genome + ")){uid kmer}}"
-    res = client.query(query)
+    query = """
+        {{
+            genome(func: has({0})){{
+                uid
+                kmer
+            }}
+        }}
+    """.format(genome)
 
-    return json.loads(res.json)
+    # This gets all but the last uid in the format {genome: [{'uid':'0x335'}, {'uid':'0x336'}]}
+    res = client.query(query)
+    j_res = json.loads(res.json)
+
+    # In the graph A-p->B-p->C has(p) will return the uid for A and B, but not C
+    # We want the last uid as well, so will construct a second query for it, using the last uid
+    last_uid = j_res['genome'][-1]['uid']
+
+    # Transaction for last query
+    last_query = """
+        {{
+          lq(func: uid({0})){{
+            {1}{{
+                uid
+                kmer
+            }}
+          }}
+        }}
+    """.format(last_uid, genome)
+
+    # This gets the last query
+    l_res = client.query(last_query)
+    j_l_res = json.loads(l_res.json)
+    return j_res['genome'] + j_l_res['lq']
+    #j_l_res['lq'][genome])
 
 
 def add_genome_to_schema(client, genome):
@@ -180,34 +216,95 @@ def add_genome_to_schema(client, genome):
     return client.alter(pydgraph.Operation(schema=schema))
 
 
+def run_subprocess(cmd):
+    """
+    Run a subprocess from python
+    :param cmd: the command to run
+    :return: The completed process
+    """
+
+    start_time = timeit.default_timer()
+    comp_proc = subprocess.run(
+        cmd,
+        shell=False,
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+
+    if comp_proc.returncode == 0:
+        elapsed_time = timeit.default_timer() - start_time
+        print("Subprocess {} finished successfully in {:0.3f} sec.".format(cmd, elapsed_time))
+        return comp_proc
+    else:
+        print("Error in subprocess. The following command failed: {}".format(cmd))
+        exit("subprocess failure")
+
+
 if __name__ == '__main__':
     stub = create_client_stub()
     client = create_client(stub)
     drop_all(client)
     set_schema(client)
 
-    directory = "data/kmers"
-    character = '_'
-    for filename in os.listdir(directory):
-        df = pd.read_pickle('data/kmers/{}'.format(filename))
-        genome = split_string(filename, character)
-        print(genome)
-        #add_genome_to_schema(client, genome)
-
     '''
     # manual addition to graph -- this would normally be functions
     add_genome_to_schema(client, "genomeA")
     add_genome_to_schema(client, "genomeB")
 
+    # Add the following two manually
     add_kmer_to_graph(client, "AAAAAAAAAAA", "TTTTTTTTCCC", "genomeA")
-    add_kmer_to_graph(client, "AAAAAAAAAAA", "CGCGCGCGCCA", "genomeB")
-    add_kmer_to_graph(client, "TTTTTTTTCCC", "ATGATGATGAT", "genomeA")
+    add_kmer_to_graph(client, "AAAAAAAAAAA", "TTTTTTTTCCC", "genomeB")
+
+    # Add the following two in bulk via the live loader
+    # Bulk loading is off by default, hence the fourth True argument
+    d1 = add_kmer_to_graph(client, "AAAAAAAAAAA", "CGCGCGCGCCA", "genomeB", True)
+    d2 = add_kmer_to_graph(client, "TTTTTTTTCCC", "ATGATGATGAT", "genomeA", True)
+    '''
+    directory = "data/kmers"
+    character = '_'
+    bulk_nquads = []
+    i = 0
+    j = 1
+    for filename in os.listdir(directory):
+        df = pd.read_pickle('data/kmers/{}'.format(filename))
+        genome = "genome_" + split_string(filename, character)
+        add_genome_to_schema(client, genome)
+        while j <= 1000:
+            d1 = add_kmer_to_graph(client, df[i], df[j], genome, True)
+            bulk_nquads.append(d1)
+            i += 1
+            j += 1
+        break
+    print(bulk_nquads)
+    # Write each nquad to a separate line in a temp file
+    # We need to close the file for subprocess to see the contents
+    # We need to set delete=False to prevent the file from being deleted when we close it
+    tfile = tempfile.NamedTemporaryFile(delete=False, mode="w")
+    for line in bulk_nquads:
+        print(line)
+        tfile.write(line + "\n")
+    tfile.close()
+
+    # Check the file
+    cat_com = [
+        "head", tfile.name
+    ]
+    my_cat = run_subprocess(cat_com)
+    print(my_cat)
+
+    # Use the live load feature to load all the nquads
+    # Use the live load feature to load all the nquads
+    command = [
+        "dgraph", "live",
+        "-r", tfile.name
+    ]
+    run_subprocess(command)
 
     #query by predicate, to see the links
-    sg1 = example_query(client, "genomeA")
-    sg2 = example_query(client, "genomeB")
+    sg1 = example_query(client, genome)
+    #sg2 = example_query(client, "genomeB")
     print(sg1)
-    print(sg2)
+    #print(sg2)
 
     print("All done")
-    '''
