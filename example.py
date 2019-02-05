@@ -260,41 +260,30 @@ def kmer_process_file(client, filename, kmer_size):
             for i in range(0, len(record.seq) - kmer_size - 1, kmer_size):
                 kmer_count +=1
 
-                ki_uid = None
-                kn_uid = None
+                ks = {
+                    'ki': record.seq[0+i:kmer_size+i],
+                    'kn': record.seq[0+i+1:kmer_size+i+1]
+                }
 
-                ki = record.seq[0+i:kmer_size+i]
-                kn = record.seq[0+i+1:kmer_size+i+1]
-
-                if ki in memoize_kmers:
-                    ki_uid = memoize_kmers[ki]
-                else:
-                    kiq = kmer_query(client, ki)
-                    if kiq:
-                        ki_uid = kiq
-                        memoize_kmers[ki] = ki_uid
+                for k in ks.keys():
+                    kuid = None
+                    if ks[k] in memoize_kmers:
+                        kuid = memoize_kmers[ks[k]]
                     else:
-                        ki_uid = "_:b" + ki
-                        memoize_kmers[ki] = ki_uid
-                        bulk_data +=('{0} <kmer> "{1}" .{2}'.format(ki_uid, ki, "\n"))
+                        kq = kmer_query(client, ks[k])
+                        if kq:
+                            kuid = kq
+                            memoize_kmers[ks[k]] = kuid
+                        else:
+                            kuid = "_:b" + ks[k]
+                            memoize_kmers[ks[k]] = kuid
+                            bulk_data +=('{0} <kmer> "{1}" .{2}'.format(kuid, ks[k], "\n"))
 
-                if kn in memoize_kmers:
-                    kn_uid = memoize_kmers[kn]
-                else:
-                    knq = kmer_query(client, kn)
-                    if knq:
-                        kn_uid = knq
-                        memoize_kmers[kn] = kn_uid
-                    else:
-                        kn_uid = "_:b" + kn
-                        memoize_kmers[kn] = kn_uid
-                        bulk_data +=('{0} <kmer> "{1}" .{2}'.format(kn_uid, kn, "\n"))
-
-                bulk_data +=('{0} <genomeA> {1} .{2}'.format(ki_uid, kn_uid, "\n"))
+                bulk_data +=('{0} <genomeA> {1} .{2}'.format(memoize_kmers[ks['ki']], memoize_kmers[ks['kn']], "\n"))
 
                 if kmer_count % 1000 == 0:
                     print(".", end='')
-            if record_count == 100:
+            if record_count == 10:
                 break
     tfile.write(bulk_data)
     tfile.close()
