@@ -11,7 +11,7 @@ import json
 import tempfile
 import subprocess
 import timeit
-
+from Bio import SeqIO
 
 def create_client_stub():
     """
@@ -238,6 +238,75 @@ def run_subprocess(cmd):
         exit("subprocess failure")
 
 
+def kmer_process_file(client, filename, kmer_size):
+    """
+    Read in a fasta file. Return a list of all kmers of given size.
+    Using BioPython, and lots of RAM.
+    :param client: dgraph client
+    :param filename: Fasta file to process
+    :param kmer_size: Size of kmer to process file into
+    :return: A list of all kmers
+    """
+
+    memoize_kmers = {}
+    bulk_data = ""
+
+    tfile = tempfile.NamedTemporaryFile(delete=False, mode="w")
+    with open(filename, "r") as f:
+        record_count=0
+        for record in SeqIO.parse(f, "fasta"):
+            record_count +=1
+            kmer_count = 0
+            for i in range(0, len(record.seq) - kmer_size - 1, kmer_size):
+                kmer_count +=1
+
+                ki_uid = None
+                kn_uid = None
+
+                ki = record.seq[0+i:kmer_size+i]
+                kn = record.seq[0+i+1:kmer_size+i+1]
+
+                if ki in memoize_kmers:
+                    ki_uid = memoize_kmers[ki]
+                else:
+                    kiq = kmer_query(client, ki)
+                    if kiq:
+                        ki_uid = kiq
+                        memoize_kmers[ki] = ki_uid
+                    else:
+                        ki_uid = "_:b" + ki
+                        memoize_kmers[ki] = ki_uid
+                        bulk_data +=('{0} <kmer> "{1}" .{2}'.format(ki_uid, ki, "\n"))
+
+                if kn in memoize_kmers:
+                    kn_uid = memoize_kmers[kn]
+                else:
+                    knq = kmer_query(client, kn)
+                    if knq:
+                        kn_uid = knq
+                        memoize_kmers[kn] = kn_uid
+                    else:
+                        kn_uid = "_:b" + kn
+                        memoize_kmers[kn] = kn_uid
+                        bulk_data +=('{0} <kmer> "{1}" .{2}'.format(kn_uid, kn, "\n"))
+
+                bulk_data +=('{0} <genomeA> {1} .{2}'.format(ki_uid, kn_uid, "\n"))
+
+                if kmer_count % 1000 == 0:
+                    print(".", end='')
+            if record_count == 100:
+                break
+    tfile.write(bulk_data)
+    tfile.close()
+    # Use the live load feature to load all the nquads
+    command = [
+        "dgraph", "live",
+        "-r", tfile.name
+    ]
+    bulk_return = run_subprocess(command)
+    print(bulk_return)
+
+
 if __name__ == '__main__':
     stub = create_client_stub()
     client = create_client(stub)
@@ -254,38 +323,42 @@ if __name__ == '__main__':
 
     # Add the following two in bulk via the live loader
     # Bulk loading is off by default, hence the fourth True argument
-    d1 = add_kmer_to_graph(client, "AAAAAAAAAAA", "CGCGCGCGCCA", "genomeB", True)
-    d2 = add_kmer_to_graph(client, "TTTTTTTTCCC", "ATGATGATGAT", "genomeA", True)
-    bulk_nquads = [d1, d2]
+    # d1 = add_kmer_to_graph(client, "AAAAAAAAAAA", "CGCGCGCGCCA", "genomeB", True)
+    # d2 = add_kmer_to_graph(client, "TTTTTTTTCCC", "ATGATGATGAT", "genomeA", True)
+    # bulk_nquads = [d1, d2]
+
+    kmer_process_file(client, "/tmp/pdog/pdog/data/test.fasta", 11)
 
     # Write each nquad to a separate line in a temp file
     # We need to close the file for subprocess to see the contents
     # We need to set delete=False to prevent the file from being deleted when we close it
-    tfile = tempfile.NamedTemporaryFile(delete=False, mode="w")
-    for line in bulk_nquads:
-        print(line)
-        tfile.write(line + "\n")
-    tfile.close()
+    # tfile = tempfile.NamedTemporaryFile(delete=False, mode="a")
+    # bulk_nquads = []
+    # for i in range(0, len(bulk_kmers), 1):
+    #     tfile.write(add_kmer_to_graph(client, bulk_kmers[i], bulk_kmers[i+1], "test", True) + "\n")
+    #     if i == 10000:
+    #         break
+    # tfile.close()
 
     # Check the file
-    cat_com = [
-        "head", tfile.name
-    ]
-    my_cat = run_subprocess(cat_com)
-    print(my_cat)
+    # cat_com = [
+    #     "head", tfile.name
+    # ]
+    # my_cat = run_subprocess(cat_com)
+    # print(my_cat)
 
     # Use the live load feature to load all the nquads
-    command = [
-        "dgraph", "live",
-        "-r", tfile.name
-    ]
-    bulk_return = run_subprocess(command)
-    print(bulk_return)
+    # command = [
+    #     "dgraph", "live",
+    #     "-r", tfile.name
+    # ]
+    # bulk_return = run_subprocess(command)
+    # print(bulk_return)
 
     #query by predicate, to see the links
-    sg1 = example_query(client, "genomeA")
+    #sg1 = example_query(client, "genomeA")
     #sg2 = example_query(client, "genomeB")
-    print(sg1)
+    #print(sg1)
     #print(sg2)
 
     print("All done")
