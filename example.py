@@ -234,7 +234,7 @@ def run_subprocess(cmd):
         print("Subprocess {} finished successfully in {:0.3f} sec.".format(cmd, elapsed_time))
         return comp_proc
     else:
-        print("Error in subprocess. The following command failed: {}".format(cmd))
+        print("Error in subprocess. The following command failed: {}".format(comp_proc))
         exit("subprocess failure")
 
 
@@ -259,16 +259,28 @@ if __name__ == '__main__':
     bulk_nquads = [d1, d2]
 
     # Write each nquad to a separate line in a temp file
-    with tempfile.NamedTemporaryFile() as temp_file:
-        for line in bulk_nquads:
-            temp_file.write(b'line')
+    # We need to close the file for subprocess to see the contents
+    # We need to set delete=False to prevent the file from being deleted when we close it
+    tfile = tempfile.NamedTemporaryFile(delete=False, mode="w")
+    for line in bulk_nquads:
+        print(line)
+        tfile.write(line + "\n")
+    tfile.close()
 
-        # Use the live load feature to load all the nquads
-        command = [
-            "dgraph", "live",
-            "-r", temp_file.name
-        ]
-        run_subprocess(command)
+    # Check the file
+    cat_com = [
+        "head", tfile.name
+    ]
+    my_cat = run_subprocess(cat_com)
+    print(my_cat)
+
+    # Use the live load feature to load all the nquads
+    command = [
+        "dgraph", "live",
+        "-r", tfile.name
+    ]
+    bulk_return = run_subprocess(command)
+    print(bulk_return)
 
     #query by predicate, to see the links
     sg1 = example_query(client, "genomeA")
