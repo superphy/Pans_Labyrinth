@@ -55,7 +55,7 @@ def set_schema(client):
     :return: The client altered via the schema set out here
     """
     schema = """
-        kmer: string @index(exact, term) .       
+        kmer: string @index(exact, term) .
     """
 
     return client.alter(pydgraph.Operation(schema=schema))
@@ -166,7 +166,7 @@ def kmer_multiple_query(client, kmer_list):
             {
                 uid
                 kmer
-            }      
+            }
     }
     """
     variables = {'$klist': ' '.join(kmer_list)}
@@ -190,12 +190,12 @@ def example_query(client, genome):
 
     # Transaction for the query
     query = """
-        {{        
+        {{
             genome(func: has({0})){{
                 uid
-                kmer                                     
-            }}  
-        }}   
+                kmer
+            }}
+        }}
     """.format(genome)
 
     # This gets all but the last uid in the format {genome: [{'uid':'0x335'}, {'uid':'0x336'}]}
@@ -214,8 +214,8 @@ def example_query(client, genome):
                 uid
                 kmer
             }}
-          }}  
-        }}    
+          }}
+        }}
     """.format(last_uid, genome)
 
     # This gets the last query
@@ -278,7 +278,7 @@ def kmer_from_file(filename, kmer_size):
     with open(filename, "r") as f:
         for record in SeqIO.parse(f, "fasta"):
             all_kmers[record.id]=[]
-            for i in range(0, len(record.seq) - kmer_size - 1, kmer_size):
+            for i in range(0, len(record.seq) - kmer_size - 2, kmer_size):
                 all_kmers[record.id].append(str(record.seq[0+i:kmer_size+i]))
     return all_kmers
 
@@ -493,4 +493,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
