@@ -12,6 +12,8 @@ import tempfile
 import subprocess
 import timeit
 from Bio import SeqIO
+from multiprocessing import Pool, Process
+from functools import partial
 
 def create_client_stub():
     """
@@ -53,7 +55,7 @@ def set_schema(client):
     :return: The client altered via the schema set out here
     """
     schema = """
-        kmer: string @index(exact) .       
+        kmer: string @index(exact, term) .       
     """
 
     return client.alter(pydgraph.Operation(schema=schema))
@@ -151,6 +153,33 @@ def kmer_query(client, kmer):
         return None
 
 
+def kmer_multiple_query(client, kmer_list):
+    """
+    Bulk query a list of kmers and return a dictionary of kmer:uid.
+    :param client: dgraph client
+    :param kmer_list: List of kmers to query dgraph for
+    :return: [dict{kmer:uid}]
+    """
+    query = """
+        query find_all($klist: string){
+            find_all(func: anyofterms(kmer, $klist))
+            {
+                uid
+                kmer
+            }      
+    }
+    """
+    variables = {'$klist': ' '.join(kmer_list)}
+    res = client.query(query, variables=variables)
+    json_res = json.loads(res.json)
+
+    if json_res['find_all']:
+        return json_res['find_all']
+    else:
+        return None
+
+
+
 def example_query(client, genome):
     """
     Example of getting a subgraph from a predicate query
@@ -238,9 +267,25 @@ def run_subprocess(cmd):
         exit("subprocess failure")
 
 
+def kmer_from_file(filename, kmer_size):
+    """
+     Read in a fasta file. Return a dict of lists all kmers of given size.
+    :param filename: Fasta file to process
+    :param kmer_size: Size of kmer
+    :return: Dict of lists of all kmers dict{contig:[kmers]}
+    """
+    all_kmers = {}
+    with open(filename, "r") as f:
+        for record in SeqIO.parse(f, "fasta"):
+            all_kmers[record.id]=[]
+            for i in range(0, len(record.seq) - kmer_size - 1, kmer_size):
+                all_kmers[record.id].append(str(record.seq[0+i:kmer_size+i]))
+    return all_kmers
+
+
 def kmer_process_file(client, filename, kmer_size):
     """
-    Read in a fasta file. Return a list of all kmers of given size.
+
     Using BioPython, and lots of RAM.
     :param client: dgraph client
     :param filename: Fasta file to process
@@ -283,7 +328,7 @@ def kmer_process_file(client, filename, kmer_size):
 
                 if kmer_count % 1000 == 0:
                     print(".", end='')
-            if record_count == 10:
+            if record_count == 1:
                 break
     tfile.write(bulk_data)
     tfile.close()
@@ -296,7 +341,137 @@ def kmer_process_file(client, filename, kmer_size):
     print(bulk_return)
 
 
-if __name__ == '__main__':
+
+def add_kmers_to_dict(kmer_dict, kmers):
+    """
+    Updates a dictionary of kmer:uid.
+    Requires the list to be in the form of [{kmer:uid}], as is returned from kmer_multiple_query()
+    :param kmer_dict: {kmer:uid}
+    :param kmers: [{kmer:uid}]
+    :return: The updated dictionary
+    """
+    if kmers:
+        for ku in kmers:
+            kmer_dict[ku['kmer']]=ku['uid']
+
+    return kmer_dict
+
+
+def add_all_kmers_to_graph(client, all_kmers, genome):
+    """
+    Add all kmers from a given genome to the graph
+    :param client: dgraph client
+    :param all_kmers: dict of lists of all kmers in genome dict[contig:[kmers]]
+    :param genome: name of genome to add
+    :return: None
+    """
+
+    # query a batch of kmers in bulk and get the uids if they exist
+    pc = partial(process_contig_kmer, client=client, genome=genome)
+
+    with Pool(processes=1) as pool:
+        results = pool.map_async(pc, all_kmers.values())
+        results.wait()
+
+
+
+def process_contig_kmer(ckmers, client, genome):
+    """
+    Process a single contig into kmers, adding nodes and edges for each
+    :param ckmers: The list of kmers for the contig
+    :param client: dgraph client
+    :param genome: indexed edge genome name
+    :return: success
+    """
+    # Query for all existing kmers
+    kmer_uid_dict = {}
+    kmer_uid_dict = add_kmers_to_dict(kmer_uid_dict, kmer_multiple_query(client, ckmers))
+
+    # Create list of kmers that need to be batch inserted into graph
+    kmers_to_insert = []
+    for kmer in ckmers:
+        if kmer not in kmer_uid_dict:
+            kmers_to_insert.append(kmer)
+
+    if kmers_to_insert:
+        # Bulk insert the kmers
+        txn_result_dict = add_batch_kmers(client, kmers_to_insert)
+
+        # Update the dict of kmer:uid
+        kmer_uid_dict = add_kmers_to_dict(kmer_uid_dict, txn_result_dict)
+
+    # Batch the connections between the kmers
+    add_edges_to_kmers(client, ckmers, kmer_uid_dict, genome)
+    return None
+
+
+def add_edges_to_kmers(client, kmers, kmer_uid_dict, genome):
+    """
+    Given a list of previously inserted kmers, and the corresponding dictionary of the uids
+    create edges between all kmers, sequentially.
+    :param client: the dgraph client
+    :param kmers: list of linked kmers
+    :param kmer_uid_dict: {kmer:uid}
+    :param genome: the indexed edge name to connect the kmer nodes
+    :return: None
+    """
+
+    bulk_quads = []
+    # We are adding sequential kmers, so we need only start at index len(kmer)-2 to
+    # ensure that all kmers are linked
+    for i in range(0, len(kmers)-2):
+        bulk_quads.append('<{0}> <{1}> <{2}> .{3}'.format(kmer_uid_dict[kmers[i]],
+                                                         genome,
+                                                         kmer_uid_dict[kmers[i+1]],
+                                                         "\n"
+                                                        ))
+    # Start the transaction
+    txn = client.txn()
+
+    try:
+        m = txn.mutate(set_nquads=''.join(bulk_quads))
+        txn.commit()
+
+    finally:
+        txn.discard()
+
+
+def add_batch_kmers(client, kmer_list):
+    """
+    Add all the kmers in the list to the graph.
+    Return the results from the transaction in the requires list of dict format.
+    :param client: dgraph client
+    :param kmer_list: list of kmers that need to be added to new nodes
+    :return: List of {'kmer':kmer, 'uid':uid}
+    """
+    # Data to be inserted
+    bulk_quads = []
+    for kmer in kmer_list:
+        bulk_quads.append('_:{0} <kmer> "{0}" .{1}'.format(kmer, "\n"))
+
+    # start the transaction
+    txn = client.txn()
+
+    try:
+        m = txn.mutate(set_nquads=''.join(bulk_quads))
+        txn.commit()
+
+        # Create the output in the form that the program is expecting
+        kmer_dict_list = []
+        for uid in m.uids:
+            kmer_dict_list.append({'kmer':uid, 'uid':m.uids[uid]})
+    finally:
+        txn.discard()
+
+    return kmer_dict_list
+
+
+def main():
+    """
+    The program
+    :return: success
+    """
+
     stub = create_client_stub()
     client = create_client(stub)
     drop_all(client)
@@ -306,48 +481,16 @@ if __name__ == '__main__':
     add_genome_to_schema(client, "genomeA")
     add_genome_to_schema(client, "genomeB")
 
-    # Add the following two manually
-    add_kmer_to_graph(client, "AAAAAAAAAAA", "TTTTTTTTCCC", "genomeA")
-    add_kmer_to_graph(client, "AAAAAAAAAAA", "TTTTTTTTCCC", "genomeB")
-
-    # Add the following two in bulk via the live loader
-    # Bulk loading is off by default, hence the fourth True argument
-    # d1 = add_kmer_to_graph(client, "AAAAAAAAAAA", "CGCGCGCGCCA", "genomeB", True)
-    # d2 = add_kmer_to_graph(client, "TTTTTTTTCCC", "ATGATGATGAT", "genomeA", True)
-    # bulk_nquads = [d1, d2]
-
-    kmer_process_file(client, "/tmp/pdog/pdog/data/test.fasta", 11)
-
-    # Write each nquad to a separate line in a temp file
-    # We need to close the file for subprocess to see the contents
-    # We need to set delete=False to prevent the file from being deleted when we close it
-    # tfile = tempfile.NamedTemporaryFile(delete=False, mode="a")
-    # bulk_nquads = []
-    # for i in range(0, len(bulk_kmers), 1):
-    #     tfile.write(add_kmer_to_graph(client, bulk_kmers[i], bulk_kmers[i+1], "test", True) + "\n")
-    #     if i == 10000:
-    #         break
-    # tfile.close()
-
-    # Check the file
-    # cat_com = [
-    #     "head", tfile.name
-    # ]
-    # my_cat = run_subprocess(cat_com)
-    # print(my_cat)
-
-    # Use the live load feature to load all the nquads
-    # command = [
-    #     "dgraph", "live",
-    #     "-r", tfile.name
-    # ]
-    # bulk_return = run_subprocess(command)
-    # print(bulk_return)
+    all_kmers = kmer_from_file("/tmp/pdog/pdog/data/test.fasta", 11)
+    add_all_kmers_to_graph(client, all_kmers, "genomeA")
 
     #query by predicate, to see the links
     #sg1 = example_query(client, "genomeA")
-    #sg2 = example_query(client, "genomeB")
     #print(sg1)
-    #print(sg2)
 
     print("All done")
+
+
+if __name__ == '__main__':
+    main()
+
