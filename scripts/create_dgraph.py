@@ -470,6 +470,11 @@ def add_batch_kmers(client, kmer_list):
 	return kmer_dict_list
 
 def compute_hash(filename):
+	'''
+	Takes a path to a fasts file and creates a hash of the file to be
+	used as the genome edge name
+	:param filename: path tot eh fasta file to be hashed
+	'''
 	try:
 		BUF_SIZE = 65536
 		sha1 = hashlib.sha1()
@@ -485,13 +490,22 @@ def compute_hash(filename):
 		sys.exit()
 	return hash
 
+
 def walkdir(folder):
-	"""Walk through each files in a directory"""
+	'''
+	Walk through each files in a directory and yeild all the paths in the dir
+	:param folder: the folder containing all the files to walk through
+	'''
 	for dirpath, dirs, files in os.walk(folder):
 		for filename in files:
 			yield os.path.abspath(os.path.join(dirpath, filename))
 
 def fill_graph_progess(client):
+	'''
+	Fills the graph with kmers and edges based on a given folder containing genomes
+	Run time is arount 1 hour 
+	:param client: the dgraph client
+	'''
 	path = "data/genomes/clean"
 	filecounter = 0
 	for filepath in walkdir(path):
@@ -504,16 +518,6 @@ def fill_graph_progess(client):
 			all_kmers = kmer_from_file(filename, 11)
 			add_all_kmers_to_graph(client, all_kmers, genome)
 
-def fill_graph(client):
-	directory = "data/genomes/clean"
-	x = 0
-	for filename in os.listdir(directory):
-		print(filename)
-		genome = "genome_" + compute_hash(filename)
-		add_genome_to_schema(client, genome)
-		all_kmers = kmer_from_file("data/genomes/{}".format(filename), 11)
-		add_all_kmers_to_graph(client, all_kmers, genome)
-
 
 def main():
 	"""
@@ -525,7 +529,6 @@ def main():
 	client = create_client(stub)
 	drop_all(client)
 	set_schema(client)
-	#fill_graph(client)
 	fill_graph_progess(client)
 
 	# manual addition to graph -- this would normally be functions
