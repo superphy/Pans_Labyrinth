@@ -520,11 +520,25 @@ def fill_graph_progess(client):
 			add_all_kmers_to_graph(client, all_kmers, genome)
 
 
-def arg_parser():
+def arg_parser(client):
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-i", "--insert", action = 'append', help = "Insert a new genome into the graph using a fasta file",)
 	parser.add_argument("-q", "--query", action = 'append', help = "Find genome path in the graph based on the fasta file hash")
 	parser.add_argument("-d", "--delete", action = 'append', help = "Remove a genome grom the graph by using a the fasta file hash")
+
+	opt = parser.parse_args([])
+	if not any([opt.i, opt.q, opt.d]):
+    	ap.print_usage()
+	else:
+		insert_genome(client, opt.i)
+		query_for_genome(client, opt.q)
+		delete_genome(client, opt.d)
+
+def insert_genome(client, genome):
+
+def query_for_genome(client, genome):
+
+def delete_genome(client, genome):
 
 
 def main():
@@ -532,12 +546,13 @@ def main():
 	The program
 	:return: success
 	"""
-	arg_parser()
+
 	stub = create_client_stub()
 	client = create_client(stub)
-	drop_all(client)
-	set_schema(client)
-	fill_graph_progess(client)
+	arg_parser(client)
+	#drop_all(client)
+	#set_schema(client)
+	#fill_graph_progess(client)
 
 	# manual addition to graph -- this would normally be functions
 	#add_genome_to_schema(client, "genomeA")
