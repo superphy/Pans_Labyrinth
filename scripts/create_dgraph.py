@@ -205,8 +205,10 @@ def example_query(client, genome):
 
 	# This gets all but the last uid in the format {genome: [{'uid':'0x335'}, {'uid':'0x336'}]}
 	res = client.query(query)
+	print(res)
 	j_res = json.loads(res.json)
 
+	'''
 	# In the graph A-p->B-p->C has(p) will return the uid for A and B, but not C
 	# We want the last uid as well, so will construct a second query for it, using the last uid
 	last_uid = j_res['genome'][-1]['uid']
@@ -226,7 +228,10 @@ def example_query(client, genome):
 	# This gets the last query
 	l_res = client.query(last_query)
 	j_l_res = json.loads(l_res.json)
-	return j_res['genome'] + j_l_res['lq']
+	'''
+	print(j_res)
+	#return j_res[]
+	#+ j_l_res['lq']
 	#j_l_res['lq'][genome])
 
 
@@ -247,31 +252,6 @@ def add_genome_to_schema(client, genome):
 	return client.alter(pydgraph.Operation(schema=schema))
 
 
-def run_subprocess(cmd):
-	"""
-	Run a subprocess from python
-	:param cmd: the command to run
-	:return: The completed process
-	"""
-
-	start_time = timeit.default_timer()
-	comp_proc = subprocess.run(
-		cmd,
-		shell=False,
-		check=False,
-		stdout=subprocess.PIPE,
-		stderr=subprocess.PIPE
-	)
-
-	if comp_proc.returncode == 0:
-		elapsed_time = timeit.default_timer() - start_time
-		print("Subprocess {} finished successfully in {:0.3f} sec.".format(cmd, elapsed_time))
-		return comp_proc
-	else:
-		print("Error in subprocess. The following command failed: {}".format(comp_proc))
-		exit("subprocess failure")
-
-
 def kmer_from_file(filename, kmer_size):
 	"""
 	 Read in a fasta file. Return a dict of lists all kmers of given size.
@@ -286,65 +266,6 @@ def kmer_from_file(filename, kmer_size):
 			for i in range(0, len(record.seq) - kmer_size - 2, kmer_size):
 				all_kmers[record.id].append(str(record.seq[0+i:kmer_size+i]))
 	return all_kmers
-
-
-def kmer_process_file(client, filename, kmer_size):
-	"""
-
-	Using BioPython, and lots of RAM.
-	:param client: dgraph client
-	:param filename: Fasta file to process
-	:param kmer_size: Size of kmer to process file into
-	:return: A list of all kmers
-	"""
-
-	memoize_kmers = {}
-	bulk_data = ""
-
-	tfile = tempfile.NamedTemporaryFile(delete=False, mode="w")
-	with open(filename, "r") as f:
-		record_count=0
-		for record in SeqIO.parse(f, "fasta"):
-			record_count +=1
-			kmer_count = 0
-			for i in range(0, len(record.seq) - kmer_size - 1, kmer_size):
-				kmer_count +=1
-
-				ks = {
-					'ki': record.seq[0+i:kmer_size+i],
-					'kn': record.seq[0+i+1:kmer_size+i+1]
-				}
-
-				for k in ks.keys():
-					kuid = None
-					if ks[k] in memoize_kmers:
-						kuid = memoize_kmers[ks[k]]
-					else:
-						kq = kmer_query(client, ks[k])
-						if kq:
-							kuid = kq
-							memoize_kmers[ks[k]] = kuid
-						else:
-							kuid = "_:b" + ks[k]
-							memoize_kmers[ks[k]] = kuid
-							bulk_data +=('{0} <kmer> "{1}" .{2}'.format(kuid, ks[k], "\n"))
-
-				bulk_data +=('{0} <genomeA> {1} .{2}'.format(memoize_kmers[ks['ki']], memoize_kmers[ks['kn']], "\n"))
-
-				if kmer_count % 1000 == 0:
-					print(".", end='')
-			if record_count == 1:
-				break
-	tfile.write(bulk_data)
-	tfile.close()
-	# Use the live load feature to load all the nquads
-	command = [
-		"dgraph", "live",
-		"-r", tfile.name
-	]
-	bulk_return = run_subprocess(command)
-	print(bulk_return)
-
 
 
 def add_kmers_to_dict(kmer_dict, kmers):
@@ -507,17 +428,21 @@ def fill_graph_progess(client):
 	Run time is arount 1 hour
 	:param client: the dgraph client
 	'''
-	path = "data/genomes/clean"
+	path = "data/genomes/test" # TODO change back to clean folder
 	filecounter = 0
+	x = 0
 	for filepath in walkdir(path):
 		filecounter += 1
 	for filepath in tqdm(walkdir(path), total=filecounter, unit="files"):
 		with open(filepath, 'rb') as file:
 			filename = file.name
 			genome = "genome_" + compute_hash(filename)
+			print(genome)
 			add_genome_to_schema(client, genome)
 			all_kmers = kmer_from_file(filename, 11)
 			add_all_kmers_to_graph(client, all_kmers, genome)
+			sg1 = example_query(client, genome) # why dont you work?
+			#print(sg1)
 
 
 def arg_parser(client):
@@ -526,19 +451,37 @@ def arg_parser(client):
 	parser.add_argument("-q", "--query", action = 'append', help = "Find genome path in the graph based on the fasta file hash")
 	parser.add_argument("-d", "--delete", action = 'append', help = "Remove a genome grom the graph by using a the fasta file hash")
 
-	opt = parser.parse_args([])
-	if not any([opt.i, opt.q, opt.d]):
-    	ap.print_usage()
-	else:
-		insert_genome(client, opt.i)
-		query_for_genome(client, opt.q)
-		delete_genome(client, opt.d)
+	opt = parser.parse_args()
+	print(opt)
+	if opt.insert:
+		insert_genome(client, opt.insert)
+	if opt.query:
+		query_for_genome(client, opt.query)
+	if opt.delete:
+		delete_genome(client, opt.delete)
 
-def insert_genome(client, genome):
+def insert_genome(client, genomes):
+	for genome in genomes:
+		filename = "data/genomes/insert/{}".format(genome)
+		genome = "genome_" + compute_hash(filename)
+		add_genome_to_schema(client, genome)
+		all_kmers = kmer_from_file(filename, 11)
+		add_all_kmers_to_graph(client, all_kmers, genome)
+	print("inserted genome(s)")
 
-def query_for_genome(client, genome):
 
-def delete_genome(client, genome):
+def query_for_genome(client, genomes):
+	for genome in genomes:
+		filename = "data/genomes/insert/{}".format(genome) # TODO change pathing and figure out metadata querying
+		genome = "genome_" + compute_hash(filename)
+		sg1 = example_query(client, genome)
+		print(sg1)
+
+
+def delete_genome(client, genomes):
+	for genome in genomes:
+		genome = "genome_" + compute_hash(filename)
+
 
 
 def main():
@@ -549,10 +492,10 @@ def main():
 
 	stub = create_client_stub()
 	client = create_client(stub)
-	arg_parser(client)
-	#drop_all(client)
-	#set_schema(client)
-	#fill_graph_progess(client)
+	#arg_parser(client)
+	drop_all(client)
+	set_schema(client)
+	fill_graph_progess(client)
 
 	# manual addition to graph -- this would normally be functions
 	#add_genome_to_schema(client, "genomeA")
