@@ -483,9 +483,6 @@ def delete_genome(client, genomes):
 		genome = "genome_" + compute_hash(filename)
 
 
-
-
-
 def main():
 	"""
 	The program
