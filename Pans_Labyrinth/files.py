@@ -12,7 +12,7 @@ def fill_graph_progess(client):
     Run time is arount 1 hour
     :param client: the dgraph client
     '''
-    path = "data/genomes/test" # TODO change back to clean folder
+    path = os.path.abspath("data/genomes/test") # TODO change back to clean folder
     filecounter = 0
     x = 0
     for filepath in walkdir(path):
@@ -28,5 +28,5 @@ def fill_graph_progess(client):
             #add_all_kmers_to_graph(client, all_kmers, genome)
             #print(kmers[0], kmers[1])
             add_kmer_to_graph(client, kmers[0], kmers[1], genome)
-            sg1 = example_query(client, genome) 
+            sg1 = example_query(client, genome)
             print(sg1)

@@ -16,11 +16,11 @@
 
 # pathing
 * change paths to os.path
-* change projext structure
+* change project structure DONE
 
 # Query
-* query for genome and return list of kmers
-* Create list -> grab first two indexes -> insert to graph -> query for those two kmers
+* query for genome and return list of kmers DONE
+* Create list -> grab first two indexes -> insert to graph -> query for those two kmers DONE
 
 * pep8 standardization
 * main.py

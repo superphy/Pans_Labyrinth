@@ -56,7 +56,7 @@ def arg_parser(client):
 
 def insert_genome(client, genomes):
 	for genome in genomes:
-		filename = "data/genomes/insert/{}".format(genome)
+		filename = os.path.abspath("data/genomes/insert/{}".format(genome))
 		genome = "genome_" + compute_hash(filename)
 		add_genome_to_schema(client, genome)
 		all_kmers = kmer_from_file(filename, 11)
@@ -66,7 +66,7 @@ def insert_genome(client, genomes):
 
 def query_for_genome(client, genomes):
 	for genome in genomes:
-		filename = "data/genomes/insert/{}".format(genome) # TODO change pathing and figure out metadata querying
+		filename = os.path.abspath("data/genomes/insert/{}".format(genome)) # TODO change pathing and figure out metadata querying
 		genome = "genome_" + compute_hash(filename)
 		sg1 = example_query(client, genome)
 		print(sg1)
