@@ -19,15 +19,7 @@ import pydgraph
 import json
 from Bio import SeqIO
 from functools import partial
-import sys
-import os
-import hashlib
-import argparse
 from concurrent.futures import ThreadPoolExecutor
-from tqdm import tqdm
-from files import *
-from dgraph import *
-from commandline import *
 
 
 def create_client_stub():
@@ -204,7 +196,7 @@ def add_kmers_dgraph(client, all_kmers, genome):
     """
 
     # query a batch of kmers in bulk and get the uids if they exist
-    pc = partial(process_contig_kmer, client=client, genome=genome)
+    pc = partial(get_kmers_contig, client=client, genome=genome)
 
     with ThreadPoolExecutor(max_workers=12) as ex:
         res = ex.map(pc, all_kmers.values())
@@ -234,7 +226,7 @@ def get_kmers_contig(ckmers, client, genome):
     """
     # Query for all existing kmers
     kmer_uid_dict = {}
-    kmer_uid_dict = add_kmers_to_dict(kmer_uid_dict, kmer_multiple_query(client, ckmers))
+    kmer_uid_dict = add_kmers_dict(kmer_uid_dict, query_kmers_dgraph(client, ckmers))
 
     # Create list of kmers that need to be batch inserted into graph
     kmers_to_insert = []
@@ -244,15 +236,15 @@ def get_kmers_contig(ckmers, client, genome):
 
     if kmers_to_insert:
         # Bulk insert the kmers
-        txn_result_dict = add_batch_kmers(client, kmers_to_insert)
+        txn_result_dict = add_kmers_batch_dgraph(client, kmers_to_insert)
 
         # Update the dict of kmer:uid
-        kmer_uid_dict = add_kmers_to_dict(kmer_uid_dict, txn_result_dict)
+        kmer_uid_dict = add_kmers_dict(kmer_uid_dict, txn_result_dict)
 
     # Batch the connections between the kmers
     # Creates a list of quads that need to be added later
     print('.', end='')
-    return(add_edges_to_kmers(client, ckmers, kmer_uid_dict, genome))
+    return(add_edges_kmers(client, ckmers, kmer_uid_dict, genome))
 
 
 def add_edges_kmers(client, kmers, kmer_uid_dict, genome):
