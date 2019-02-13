@@ -25,6 +25,9 @@ import hashlib
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
+from files import *
+from dgraph import *
+from commandline import *
 
 
 def create_client_stub():
@@ -143,7 +146,7 @@ def example_query(client, genome):
     print(j_res)
 
 
-def add_genome_schema(client, genome):
+def add_genome_to_schema(client, genome):
     """
     Index the genome name as a predicate, so functions can be used on it when searching etc.
     If the genome name is not added to the schema, it will not be indexed, and functions can
@@ -252,9 +255,6 @@ def get_kmers_contig(ckmers, client, genome):
     return(add_edges_to_kmers(client, ckmers, kmer_uid_dict, genome))
 
 
-
-
-
 def add_edges_kmers(client, kmers, kmer_uid_dict, genome):
     """
     Given a list of previously inserted kmers, and the corresponding dictionary of the uids
@@ -315,119 +315,92 @@ def add_kmers_batch_dgraph(client, kmer_list):
 
     return kmer_dict_list
 
+def add_kmer_to_graph(client, ki, kn, genome):
+    """
+    Every kmer needs to be linked to another kmer. Single kmers not permitted.
+    :param client: dgraph client
+    :param ki: the initial kmer. Get the uid if it exists. Otherwise create it.
+    :param kn: the next kmer, linked to ki. Get the uid if it exists. Otherwise create it.
+    :param genome: the genome label between the two kmers -- this needs to be previously indexed in the schema.
+    :return: None
+    """
 
-def compute_hash(filename):
-    '''
-    Takes a path to a fasts file and creates a hash of the file to be
-    used as the genome edge name
-    :param filename: path tot eh fasta file to be hashed
-    '''
+    # First we need to see if the two kmers exist already
+    # This is an upsert. If it exists, get the uid.
+    # Otherwise, create the uid.
+    uid_ki = kmer_upsert(client, ki)
+    uid_kn = kmer_upsert(client, kn)
+
+    #start the transaction
+    txn = client.txn()
+
+    # The two kmers (as nodes) are linked by a <genome name> predicate
     try:
-        BUF_SIZE = 65536
-        sha1 = hashlib.sha1()
-        with open(filename, 'rb') as f:
-            while True:
-                data = f.read(BUF_SIZE)
-                if not data:
-                    break
-                sha1.update(data)
-        hash = sha1.hexdigest()
-    except:
-        print("Failed to create hash")
-        sys.exit()
-    return hash
+        d = {
+            'uid': uid_ki,
+            genome: {
+                'uid': uid_kn
+            }
+        }
+        txn.mutate(set_obj=d)
+        txn.commit()
 
+    finally:
+        txn.discard()
 
-def walkdir(folder):
-    '''
-    Walk through each files in a directory and yeild all the paths in the dir
-    :param folder: the folder containing all the files to walk through
-    '''
-    for dirpath, dirs, files in os.walk(folder):
-        for filename in files:
-            yield os.path.abspath(os.path.join(dirpath, filename))
-
-
-def fill_graph_progess(client):
-    '''
-    Fills the graph with kmers and edges based on a given folder containing genomes
-    Run time is arount 1 hour
+def kmer_upsert(client, kmer):
+    """
+    Check the existence of kmer. If it exists, return the uid.
+    If it doesn't exist, create it, then return the uid.
     :param client: the dgraph client
-    '''
-    path = "data/genomes/test"  # TODO change back to clean folder
-    filecounter = 0
-    x = 0
-    for filepath in walkdir(path):
-        filecounter += 1
-    for filepath in tqdm(walkdir(path), total=filecounter, unit="files"):
-        with open(filepath, 'rb') as file:
-            filename = file.name
-            genome = "genome_" + compute_hash(filename)
-            print(genome)
-            add_genome_schema(client, genome)
-            all_kmers = get_kmers_files(filename, 11)
-            add_kmers_dgraph(client, all_kmers, genome)
-            sg1 = example_query(client, genome)  # why dont you work?
-        # print(sg1)
-
-
-def arg_parser(client):
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--insert", action='append',
-                        help="Insert a new genome into the graph using a fasta file", )
-    parser.add_argument("-q", "--query", action='append',
-                        help="Find genome path in the graph based on the fasta file hash")
-    parser.add_argument("-d", "--delete", action='append',
-                        help="Remove a genome grom the graph by using a the fasta file hash")
-
-    opt = parser.parse_args()
-    print(opt)
-    if opt.insert:
-        insert_genome(client, opt.insert)
-    if opt.query:
-        query_for_genome(client, opt.query)
-    if opt.delete:
-        delete_genome(client, opt.delete)
-
-
-def insert_genome(client, genomes):
-    for genome in genomes:
-        filename = "data/genomes/insert/{}".format(genome)
-        genome = "genome_" + compute_hash(filename)
-        add_genome_schema(client, genome)
-        all_kmers = get_kmers_files(filename, 11)
-        add_kmers_dgraph(client, all_kmers, genome)
-    print("inserted genome(s)")
-
-
-def query_for_genome(client, genomes):
-    for genome in genomes:
-        filename = "data/genomes/insert/{}".format(genome)  # TODO change pathing and figure out metadata querying
-        genome = "genome_" + compute_hash(filename)
-        sg1 = example_query(client, genome)
-        print(sg1)
-
-
-def delete_genome(client, genomes):
-    for genome in genomes:
-        genome = "genome_" + compute_hash(filename)
-
-
-def main():
-    """
-    The program
-    :return: success
+    :param kmer: kmer sequence
+    :return: uid of kmer
     """
 
-    stub = create_client_stub()
-    client = create_client(stub)
-    # arg_parser(client)
-    drop_all(client)
-    add_schema(client)
-    fill_graph_progess(client)
+    uid = kmer_query(client, kmer)
 
-    print("All done")
+    if not uid:
+        # kmer does not exist in database. Create it.
+        txn = client.txn()
+
+        try:
+            # The data we wish to add in triple form
+            d = """
+                    _:blank-0 <kmer> "{0}" .
+            """.format(kmer)
+
+            m = txn.mutate(set_nquads=d)
+            txn.commit()
+            uid = m.uids['blank-0']
+
+        finally:
+            # Good practice according the the dgraph docs
+            # No network overhead associated with it
+            txn.discard()
+
+    return uid
 
 
-if __name__ == '__main__':
-    main()
+def kmer_query(client, kmer):
+    """
+    Strictly queries the database for a kmer.
+    Returns the uid if present, None if not.
+    :param client: the dgraph client
+    :param kmer: the kmer we would like to check
+    :return: uid or None
+    """
+
+    # Transaction for the query
+    query = """
+        query find_kmer($k :string){
+            find_kmer(func: eq(kmer, $k)){uid}
+        }
+    """
+    variables = {'$k': kmer}
+    res = client.query(query, variables=variables)
+    json_res = json.loads(res.json)
+
+    if json_res['find_kmer']:
+      return json_res['find_kmer'][0]['uid']
+    else:
+        return None
