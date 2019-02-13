@@ -15,6 +15,7 @@ import sys
 import os
 import hashlib
 import argparse
+from tqdm import tqdm
 
 
 def create_client_stub():
@@ -46,11 +47,11 @@ def drop_all(client):
     return client.alter(pydgraph.Operation(drop_all=True))
 
 
-def set_schema(client):
+def add_schema(client):
     """
     We can define whatever type we like for our schema.
-    For this simple example we will have only kmers and edges as genome names.
-    add_genome_to_schema() allows genomes to be added programmatically.
+    For our database we will have kmers, and <genome name> as edges.
+    add_genome_schema() allows genomes to be added programmatically.
     :param client: dgraph client
     :return: The client altered via the schema set out here
     """
@@ -60,7 +61,7 @@ def set_schema(client):
     return client.alter(pydgraph.Operation(schema=schema))
 
 
-def kmer_multiple_query(client, kmer_list):
+def query_kmers_dgraph(client, kmer_list):
     """
     Bulk query a list of kmers and return a dictionary of kmer:uid.
     :param client: dgraph client
@@ -133,7 +134,7 @@ def example_query(client, genome):
     print(j_res)
 
 
-def add_genome_to_schema(client, genome):
+def add_genome_schema(client, genome):
     """
     Index the genome name as a predicate, so functions can be used on it when searching etc.
     If the genome name is not added to the schema, it will not be indexed, and functions can
@@ -150,7 +151,7 @@ def add_genome_to_schema(client, genome):
     return client.alter(pydgraph.Operation(schema=schema))
 
 
-def kmer_from_file(filename, kmer_size):
+def get_kmers_files(filename, kmer_size):
     """
      Read in a fasta file. Return a dict of lists all kmers of given size.
     :param filename: Fasta file to process
@@ -166,7 +167,7 @@ def kmer_from_file(filename, kmer_size):
     return all_kmers
 
 
-def add_kmers_to_dict(kmer_dict, kmers):
+def add_kmers_dict(kmer_dict, kmers):
     """
     Updates a dictionary of kmer:uid.
     Requires the list to be in the form of [{kmer:uid}], as is returned from kmer_multiple_query()
@@ -181,7 +182,7 @@ def add_kmers_to_dict(kmer_dict, kmers):
     return kmer_dict
 
 
-def add_all_kmers_to_graph(client, all_kmers, genome):
+def add_kmers_dgraph(client, all_kmers, genome):
     """
     Add all kmers from a given genome to the graph
     :param client: dgraph client
@@ -191,14 +192,14 @@ def add_all_kmers_to_graph(client, all_kmers, genome):
     """
 
     # query a batch of kmers in bulk and get the uids if they exist
-    pc = partial(process_contig_kmer, client=client, genome=genome)
+    pc = partial(get_kmers_contig, client=client, genome=genome)
 
     with Pool(processes=1) as pool:
         results = pool.map_async(pc, all_kmers.values())
         results.wait()
 
 
-def process_contig_kmer(ckmers, client, genome):
+def get_kmers_contig(ckmers, client, genome):
     """
     Process a single contig into kmers, adding nodes and edges for each
     :param ckmers: The list of kmers for the contig
@@ -208,7 +209,7 @@ def process_contig_kmer(ckmers, client, genome):
     """
     # Query for all existing kmers
     kmer_uid_dict = {}
-    kmer_uid_dict = add_kmers_to_dict(kmer_uid_dict, kmer_multiple_query(client, ckmers))
+    kmer_uid_dict = add_kmers_dict(kmer_uid_dict, query_kmers_dgraph(client, ckmers))
 
     # Create list of kmers that need to be batch inserted into graph
     kmers_to_insert = []
@@ -218,17 +219,17 @@ def process_contig_kmer(ckmers, client, genome):
 
     if kmers_to_insert:
         # Bulk insert the kmers
-        txn_result_dict = add_batch_kmers(client, kmers_to_insert)
+        txn_result_dict = add_kmers_batch_dgraph(client, kmers_to_insert)
 
         # Update the dict of kmer:uid
-        kmer_uid_dict = add_kmers_to_dict(kmer_uid_dict, txn_result_dict)
+        kmer_uid_dict = add_kmers_dict(kmer_uid_dict, txn_result_dict)
 
     # Batch the connections between the kmers
-    add_edges_to_kmers(client, ckmers, kmer_uid_dict, genome)
+    add_edges_kmers(client, ckmers, kmer_uid_dict, genome)
     return None
 
 
-def add_edges_to_kmers(client, kmers, kmer_uid_dict, genome):
+def add_edges_kmers(client, kmers, kmer_uid_dict, genome):
     """
     Given a list of previously inserted kmers, and the corresponding dictionary of the uids
     create edges between all kmers, sequentially.
@@ -259,7 +260,7 @@ def add_edges_to_kmers(client, kmers, kmer_uid_dict, genome):
         txn.discard()
 
 
-def add_batch_kmers(client, kmer_list):
+def add_kmers_batch_dgraph(client, kmer_list):
     """
     Add all the kmers in the list to the graph.
     Return the results from the transaction in the requires list of dict format.
@@ -337,9 +338,9 @@ def fill_graph_progess(client):
             filename = file.name
             genome = "genome_" + compute_hash(filename)
             print(genome)
-            add_genome_to_schema(client, genome)
-            all_kmers = kmer_from_file(filename, 11)
-            add_all_kmers_to_graph(client, all_kmers, genome)
+            add_genome_schema(client, genome)
+            all_kmers = get_kmers_files(filename, 11)
+            add_kmers_dgraph(client, all_kmers, genome)
             sg1 = example_query(client, genome)  # why dont you work?
         # print(sg1)
 
@@ -367,9 +368,9 @@ def insert_genome(client, genomes):
     for genome in genomes:
         filename = "data/genomes/insert/{}".format(genome)
         genome = "genome_" + compute_hash(filename)
-        add_genome_to_schema(client, genome)
-        all_kmers = kmer_from_file(filename, 11)
-        add_all_kmers_to_graph(client, all_kmers, genome)
+        add_genome_schema(client, genome)
+        all_kmers = get_kmers_files(filename, 11)
+        add_kmers_dgraph(client, all_kmers, genome)
     print("inserted genome(s)")
 
 
@@ -396,7 +397,7 @@ def main():
     client = create_client(stub)
     # arg_parser(client)
     drop_all(client)
-    set_schema(client)
+    add_schema(client)
     fill_graph_progess(client)
 
     # manual addition to graph -- this would normally be functions
