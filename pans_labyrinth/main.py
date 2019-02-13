@@ -1,6 +1,6 @@
-from files import *
-from dgraph import *
-from commandline import *
+#!/usr/bin/env python
+
+from pans_labyrinth import files, dgraph, commandline
 
 def main():
     """
@@ -8,13 +8,14 @@ def main():
     :return: success
     """
 
-    stub = create_client_stub()
-    client = create_client(stub)
+    stub = dgraph.create_client_stub()
+    client = dgraph.create_client(stub)
     # arg_parser(client)
-    drop_all(client)
-    add_schema(client)
-    fill_graph_progess(client)
+    dgraph.drop_all(client)
+    dgraph.add_schema(client)
+    #fill_graph_progess(client)
 
+    stub.close()
     print("All done")
 
 
