@@ -13,3 +13,14 @@
 *
 *
 *
+
+# pathing
+* change paths to os.path
+* change projext structure
+
+# Query
+* query for genome and return list of kmers
+* Create list -> grab first two indexes -> insert to graph -> query for those two kmers
+
+* pep8 standardization
+* main.py
