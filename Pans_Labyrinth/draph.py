@@ -1,9 +1,18 @@
 #!/usr/bin/env python
 
 """
-This is a simple example, using the layout of
-https://github.com/dgraph-io/pydgraph/blob/master/examples/simple/simple.py
-We have modified it for genome kmers
+This file contains functions for adding to and querying dgraph as well as
+creating the nodes and edges to be added.
+Naming conventions:
+
+verb-noun-object
+
+Two main verbs for interacting with dgraph:
+    1) add
+    2) query
+
+One additional verb for kmer construction:
+    3) get
 """
 
 import pydgraph
@@ -399,17 +408,6 @@ def main():
     drop_all(client)
     add_schema(client)
     fill_graph_progess(client)
-
-    # manual addition to graph -- this would normally be functions
-    # add_genome_to_schema(client, "genomeA")
-    # add_genome_to_schema(client, "genomeB")
-
-    # all_kmers = kmer_from_file("/tmp/pdog/pdog/data/test.fasta", 11)
-    # add_all_kmers_to_graph(client, all_kmers, "genomeA")
-
-    # query by predicate, to see the links
-    # sg1 = example_query(client, "genomeA")
-    # print(sg1)
 
     print("All done")
 
