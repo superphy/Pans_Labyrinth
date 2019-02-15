@@ -15,7 +15,7 @@
 *
 
 # pathing
-* change paths to os.path
+* change paths to os.path DONE
 * change project structure DONE
 
 # Query

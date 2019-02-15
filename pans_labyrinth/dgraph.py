@@ -396,3 +396,32 @@ def kmer_query(client, kmer):
       return json_res['find_kmer'][0]['uid']
     else:
         return None
+
+def execute_args(client, opt):
+	if opt.insert:
+		dgraph.insert_genome(client, opt.insert)
+	if opt.query:
+		dgraph.query_for_genome(client, opt.query)
+	if opt.delete:
+		dgraph.delete_genome(client, opt.delete)
+
+def insert_genome(client, genomes):
+	for genome in genomes:
+		filename = os.path.abspath("data/genomes/insert/{}".format(genome))
+		genome = "genome_" + compute_hash(filename)
+		add_genome_to_schema(client, genome)
+		all_kmers = kmer_from_file(filename, 11)
+		add_all_kmers_to_graph(client, all_kmers, genome)
+	print("inserted genome(s)")
+
+
+def query_for_genome(client, genomes):
+	for genome in genomes:
+		filename = os.path.abspath("data/genomes/insert/{}".format(genome)) # TODO change pathing and figure out metadata querying
+		genome = "genome_" + compute_hash(filename)
+		sg1 = example_query(client, genome)
+		print(sg1)
+
+def delete_genome(client, genomes):
+	for genome in genomes:
+		genome = "genome_" + compute_hash(filename)
