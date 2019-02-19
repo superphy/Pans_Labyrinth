@@ -1,5 +1,8 @@
 #!/user/bin/env python
 from pans_labyrinth import files, dgraph, commandline
+import argparse
+import sys
+import hashlib
 
 """
 Arg-parser goes here
@@ -7,7 +10,7 @@ Arg-parser goes here
 
 def compute_hash(filename):
 	'''
-	Takes a path to a fasts file and creates a hash of the file to be
+	Takes a path to a fasta file and creates a hash of the file to be
 	used as the genome edge name
 	:param filename: path to the fasta file to be hashed
 	'''

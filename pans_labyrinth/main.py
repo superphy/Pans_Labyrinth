@@ -9,20 +9,21 @@ def main():
     :return: success
     """
     path = os.path.abspath("data/genomes/test")
+    print(path)
 
     stub = dgraph.create_client_stub()
     client = dgraph.create_client(stub)
-    #commandline.arg_parser(client)
     dgraph.drop_all(client)
     dgraph.add_schema(client)
-    options = commandline.argparser(client)
-    dgraph.execute_args(client, options) # TODO figure out a better spot for this
+    #options = commandline.arg_parser(client)
+    #dgraph.execute_args(client, options) # TODO figure out a better spot for this
     for filepath in files.walkdir(path):
         with open(filepath, 'rb') as file:
             filename = file.name
-            genome = "genome_" + commandline.compute_hash(filename)
+            print(filepath, filename)
+            genome = "genome_" + commandline.compute_hash(filepath)
             dgraph.add_genome_to_schema(client, genome)
-            all_kmers = dgrap.get_kmers_files(filename, 11)
+            all_kmers = dgraph.get_kmers_files(filename, 11)
             kmers = all_kmers['SRR1122659.fasta|NODE_1_length_767768_cov_21.1582_ID_10270']
             #add_all_kmers_to_graph(client, all_kmers, genome)
             dgraph.add_kmer_to_graph(client, kmers[0], kmers[1], genome)
