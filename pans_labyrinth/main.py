@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
-from pans_labyrinth import files, dgraph, commandline
+from pans_labyrinth import files, dgraph, commandline, loggingFunctions
 import os
+import logging
 
 def main():
     """
@@ -9,29 +10,53 @@ def main():
     :return: success
     """
     path = os.path.abspath("data/genomes/test")
+    output_directory = os.path.abspath("data/logger")
     print(path)
+    # setup the application logging
+    LOG = loggingFunctions.create_logger()
 
-    stub = dgraph.create_client_stub()
-    client = dgraph.create_client(stub)
-    dgraph.drop_all(client)
-    dgraph.add_schema(client)
     #options = commandline.arg_parser(client)
+
+    fh = logging.FileHandler(os.path.join(output_directory, 'pans_labyrinth.log'), 'w', 'utf-8')
+    fh.setLevel(logging.DEBUG)
+    LOG.addHandler(fh)
+
+    #LOG.debug(options)
+    LOG.info("Starting pans_labyrinth")
+
+    try:
+        LOG.info("Creating client stub")
+        stub = dgraph.create_client_stub()
+        try:
+            LOG.info("Creating client")
+            client = dgraph.create_client(stub)
+            try:
+                LOG.info("Dropping existing graph")
+                dgraph.drop_all(client)
+                try:
+                    LOG.info("Add schema to graph with client")
+                    dgraph.add_schema(client)
+                    try:
+                        LOG.info("Starting to create graph")
+                        for filepath in files.walkdir(path):
+                            with open(filepath, 'rb') as file:
+                                dgraph.create(client, file, filepath)
+                        LOG.info("Finished creating graph")
+                    except:
+                        LOG.critical("Failed to create graph") # TODO Add more information
+                except:
+                    LOG.critical("Failed to add schema to graph")
+            except:
+                LOG.critical("Failed to drop previous graph")
+        except:
+            LOG.critical("Failed to create client")
+    except:
+        LOG.critical("Failed to create the client stub")
+
     #dgraph.execute_args(client, options) # TODO figure out a better spot for this
-    for filepath in files.walkdir(path):
-        with open(filepath, 'rb') as file:
-            filename = file.name
-            print(filepath, filename)
-            genome = "genome_" + commandline.compute_hash(filepath)
-            dgraph.add_genome_to_schema(client, genome)
-            all_kmers = dgraph.get_kmers_files(filename, 11)
-            kmers = all_kmers['SRR1122659.fasta|NODE_1_length_767768_cov_21.1582_ID_10270']
-            #add_all_kmers_to_graph(client, all_kmers, genome)
-            dgraph.add_kmer_to_graph(client, kmers[0], kmers[1], genome)
-            sg1 = dgraph.example_query(client, genome)
-            print(sg1)
 
     stub.close()
-    print("All done")
+    LOG.info("ALL DONE")
 
 
 if __name__ == '__main__':

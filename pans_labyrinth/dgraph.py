@@ -20,6 +20,7 @@ import json
 from Bio import SeqIO
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
+from pans_labyrinth import files, dgraph, commandline
 
 
 def create_client_stub():
@@ -425,3 +426,15 @@ def query_for_genome(client, genomes):
 def delete_genome(client, genomes):
 	for genome in genomes:
 		genome = "genome_" + compute_hash(filename)
+
+def create(client, file, filepath):
+    filename = file.name
+    print(filepath, filename)
+    genome = "genome_" + commandline.compute_hash(filepath)
+    dgraph.add_genome_to_schema(client, genome)
+    all_kmers = dgraph.get_kmers_files(filename, 11)
+    kmers = all_kmers['SRR1122659.fasta|NODE_1_length_767768_cov_21.1582_ID_10270']
+    #add_all_kmers_to_graph(client, all_kmers, genome)
+    dgraph.add_kmer_to_graph(client, kmers[0], kmers[1], genome)
+    sg1 = dgraph.example_query(client, genome)
+    print(sg1)
