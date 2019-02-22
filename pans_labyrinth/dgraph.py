@@ -20,7 +20,8 @@ import json
 from Bio import SeqIO
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
-from pans_labyrinth import files, dgraph, commandline
+from pans_labyrinth import files, dgraph, commandline, loggingFunctions
+import sys
 
 
 def create_client_stub():
@@ -104,7 +105,6 @@ def example_query(client, genome):
     query = """
     {{
     genome(func: has({0})){{
-    uid
     kmer
     }}
     }}
@@ -136,7 +136,7 @@ def example_query(client, genome):
     l_res = client.query(last_query)
     j_l_res = json.loads(l_res.json)
     '''
-    print(j_res)
+    return(j_res)
 
 
 def add_genome_to_schema(client, genome):
@@ -163,6 +163,11 @@ def get_kmers_files(filename, kmer_size):
     :param kmer_size: Size of kmer
     :return: Dict of lists of all kmers dict{contig:[kmers]}
     """
+    LOG = loggingFunctions.create_logger()
+    if not filename.endswith(".fasta"):
+        LOG.critical("Non fasta file detected")
+        sys.exit()
+
     all_kmers = {}
     with open(filename, "r") as f:
         for record in SeqIO.parse(f, "fasta"):
