@@ -15,11 +15,12 @@ def main():
     # setup the application logging
     LOG = loggingFunctions.create_logger()
 
-    #options = commandline.arg_parser(client)
-
     fh = logging.FileHandler(os.path.join(output_directory, 'pans_labyrinth.log'), 'w', 'utf-8')
     fh.setLevel(logging.DEBUG)
     LOG.addHandler(fh)
+
+    #options = commandline.arg_parser(client)
+    #dgraph.execute_args(client, options)
 
     #LOG.debug(options)
     LOG.info("Starting pans_labyrinth")
@@ -40,10 +41,10 @@ def main():
                         LOG.info("Starting to create graph")
                         for filepath in files.walkdir(path):
                             with open(filepath, 'rb') as file:
-                                dgraph.create(client, file, filepath)
+                                dgraph.create_graph(client, file, filepath)
                         LOG.info("Finished creating graph")
                     except:
-                        LOG.critical("Failed to create graph") # TODO Add more information
+                        LOG.critical("Failed to create graph at file - {}".format(file.name))
                 except:
                     LOG.critical("Failed to add schema to graph")
             except:
@@ -52,8 +53,6 @@ def main():
             LOG.critical("Failed to create client")
     except:
         LOG.critical("Failed to create the client stub")
-
-    #dgraph.execute_args(client, options) # TODO figure out a better spot for this
 
     stub.close()
     LOG.info("ALL DONE")

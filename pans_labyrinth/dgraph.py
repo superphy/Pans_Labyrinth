@@ -427,7 +427,7 @@ def delete_genome(client, genomes):
 	for genome in genomes:
 		genome = "genome_" + compute_hash(filename)
 
-def create(client, file, filepath):
+def create_graph(client, file, filepath):
     filename = file.name
     print(filepath, filename)
     genome = "genome_" + commandline.compute_hash(filepath)
