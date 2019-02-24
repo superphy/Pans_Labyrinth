@@ -6,7 +6,7 @@ import logging
 
 def main():
     """
-    The program
+    The program - The work horse
     :return: success
     """
     path = os.path.abspath("data/genomes/test/")
