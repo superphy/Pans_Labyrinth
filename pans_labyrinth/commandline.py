@@ -31,6 +31,12 @@ def compute_hash(filename):
 
 
 def arg_parser(client):
+	"""
+	Function to create the commandline arguments and assign them a value based on which flag was given.
+	Can either be single vales or a list of values. 
+	:param client: The dgraph client
+	:return: Which flags were given on the commandline and their values.
+	"""
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-i", "--insert", action = 'append', help = "Insert a new genome into the graph using a fasta file",)
 	parser.add_argument("-q", "--query", action = 'append', help = "Find genome path in the graph based on the fasta file hash")
