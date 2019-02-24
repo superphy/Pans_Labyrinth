@@ -404,6 +404,12 @@ def kmer_query(client, kmer):
         return None
 
 def execute_args(client, opt):
+    '''
+    Initiates which commandline argument to execute based on a flag
+    :param client: The dgraph client
+    :param opt: Which commandline flag was given
+    :param return: none
+    '''
 	if opt.insert:
 		dgraph.insert_genome(client, opt.insert)
 	if opt.query:
@@ -412,6 +418,13 @@ def execute_args(client, opt):
 		dgraph.delete_genome(client, opt.delete)
 
 def insert_genome(client, genomes):
+    """
+    Function which inserts genome(s) into the graph based on a commandline argument.
+    A list of genomes can be given as well
+    :param client: The dgraph client
+    :param genomes: Either a single genome or a list of genomes to be inserted
+    :param return: none
+    """
 	for genome in genomes:
 		filename = os.path.abspath("data/genomes/insert/{}".format(genome))
 		genome = "genome_" + compute_hash(filename)
@@ -422,6 +435,13 @@ def insert_genome(client, genomes):
 
 
 def query_for_genome(client, genomes):
+    """
+    Function which deletes genome(s) into the graph based on a commandline argument.
+    A list of genomes can be given as well
+    :param client: The dgraph client
+    :param genomes: Either a single genome or a list of genomes to be deleted
+    :param return: none
+    """
 	for genome in genomes:
 		filename = os.path.abspath("data/genomes/insert/{}".format(genome)) # TODO change pathing and figure out metadata querying
 		genome = "genome_" + compute_hash(filename)
@@ -429,17 +449,37 @@ def query_for_genome(client, genomes):
 		print(sg1)
 
 def delete_genome(client, genomes):
+    """
+    Function which queries for genome(s) in the graph based on a commandline argument.
+    A list of genomes can be given as well
+    :param client: The dgraph client
+    :param genomes: Either a single genome or a list of genomes to be queried for
+    :param return: none
+    """
 	for genome in genomes:
 		genome = "genome_" + compute_hash(filename)
 
 def create_graph(client, file, filepath):
+    """
+    This function builds the graph by being repeatedly called by the main function.
+    A path to a fasta file to be inserted is given and the function breaks the file up into its
+    kmers adn then adds those kmers to the graph with the genome name as an edge.
+    :param client: The dgraph client
+    :param file: The opened fasta file
+    :param filepath: The absolute path to the fasta file which is being inserted
+    """
     filename = file.name
     print(filepath, filename)
     genome = "genome_" + commandline.compute_hash(filepath)
     dgraph.add_genome_to_schema(client, genome)
     all_kmers = dgraph.get_kmers_files(filename, 11)
     kmers = all_kmers['SRR1122659.fasta|NODE_1_length_767768_cov_21.1582_ID_10270']
-    #add_all_kmers_to_graph(client, all_kmers, genome)
+    #dgraph.add_kmers_dgraph(client, all_kmers, genome)
+    print(kmers)
     dgraph.add_kmer_to_graph(client, kmers[0], kmers[1], genome)
+    dgraph.add_kmer_to_graph(client, kmers[2], kmers[3], genome)
+    dgraph.add_kmer_to_graph(client, kmers[4], kmers[5], genome)
+    dgraph.add_kmer_to_graph(client, kmers[6], kmers[7], genome)
+    dgraph.add_kmer_to_graph(client, kmers[8], kmers[9], genome)
     sg1 = dgraph.example_query(client, genome)
     print(sg1)

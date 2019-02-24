@@ -23,4 +23,4 @@
 * Create list -> grab first two indexes -> insert to graph -> query for those two kmers DONE
 
 * pep8 standardization
-* main.py
+* main.py DONE

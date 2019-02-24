@@ -9,7 +9,7 @@ def main():
     The program
     :return: success
     """
-    path = os.path.abspath("data/genomes/test")
+    path = os.path.abspath("data/genomes/test/")
     output_directory = os.path.abspath("data/logger")
     print(path)
     # setup the application logging
