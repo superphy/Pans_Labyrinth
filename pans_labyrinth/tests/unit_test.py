@@ -1,5 +1,5 @@
 import pytest
-from pans_labyrinth import main, files, dgraph, commandline, loggingFunctions
+from pans_labyrinth import main, files, dgraph, commandline, logging_functions
 
 def inc(x):
     return x + 1

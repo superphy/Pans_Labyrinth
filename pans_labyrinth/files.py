@@ -3,7 +3,7 @@
 import os.path
 import os
 import sys
-from pans_labyrinth import loggingFunctions
+from pans_labyrinth import logging_functions
 
 """
 Files and directory functions go here.
@@ -41,10 +41,9 @@ def get_files(file_or_directory):
 def walkdir(folder):
 	'''
 	Walk through each files in a directory and yeild all the paths in the dir
-	:param folder: the folder containing all the files to walk through
+	:param folder: The absolute path to the directory containing the files
 	'''
-	LOG = loggingFunctions.create_logger()
-
+	LOG = logging_functions.create_logger()
 	if len(os.listdir(folder)) == 0:
 		LOG.critical("Empty directory")
 		sys.exit()

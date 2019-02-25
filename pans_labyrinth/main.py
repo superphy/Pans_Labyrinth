@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from pans_labyrinth import files, dgraph, commandline, loggingFunctions
+from pans_labyrinth import files, dgraph, commandline, logging_functions
 import os
 import logging
 
@@ -13,10 +13,9 @@ def main():
     output_directory = os.path.abspath("data/logger")
     print(path)
     # setup the application logging
-    LOG = loggingFunctions.create_logger()
+    LOG = logging_functions.create_logger()
 
     fh = logging.FileHandler(os.path.join(output_directory, 'pans_labyrinth.log'), 'w', 'utf-8')
-    fh.setLevel(logging.DEBUG)
     LOG.addHandler(fh)
 
     #options = commandline.arg_parser(client)
@@ -24,35 +23,15 @@ def main():
 
     #LOG.debug(options)
     LOG.info("Starting pans_labyrinth")
+    stub = dgraph.create_client_stub()
+    client = dgraph.create_client(stub)
+    dgraph.drop_all(client)
+    dgraph.add_schema(client)
 
-    try:
-        LOG.info("Creating client stub")
-        stub = dgraph.create_client_stub()
-        try:
-            LOG.info("Creating client")
-            client = dgraph.create_client(stub)
-            try:
-                LOG.info("Dropping existing graph")
-                dgraph.drop_all(client)
-                try:
-                    LOG.info("Add schema to graph with client")
-                    dgraph.add_schema(client)
-                    try:
-                        LOG.info("Starting to create graph")
-                        for filepath in files.walkdir(path):
-                            with open(filepath, 'rb') as file:
-                                dgraph.create_graph(client, file, filepath)
-                        LOG.info("Finished creating graph")
-                    except:
-                        LOG.critical("Failed to create graph at file - {}".format(file.name))
-                except:
-                    LOG.critical("Failed to add schema to graph")
-            except:
-                LOG.critical("Failed to drop previous graph")
-        except:
-            LOG.critical("Failed to create client")
-    except:
-        LOG.critical("Failed to create the client stub")
+    LOG.info("Starting to create graph")
+    for filepath in files.walkdir(path):
+        with open(filepath, 'rb') as file:
+            dgraph.create_graph(client, file, filepath)
 
     stub.close()
     LOG.info("ALL DONE")
