@@ -1,6 +1,7 @@
 import pytest
 from pans_labyrinth import main, files, dgraph, commandline, logging_functions
 import os
+from Bio import SeqIO
 
 
 def test_query():
@@ -60,24 +61,41 @@ def test_non_fasta():
 
 def test_verify_contig():
 	path = os.path.abspath("pans_labyrinth/tests/data/contig_test")
-	with pytest.raises(SystemExit) as se:
-		stub = dgraph.create_client_stub()
-		client = dgraph.create_client(stub)
-		dgraph.drop_all(client)
-		dgraph.add_schema(client)
-		for filepath in files.walkdir(path):
-			with open(filepath, 'rb') as file:
-				x = 0
-				filename = file.name
-				genome = "genome_" + commandline.compute_hash(filepath)
-				dgraph.add_genome_to_schema(client, genome)
-				all_kmers = dgraph.get_kmers_files(filename, 11)
-				print(all_kmers)
-				kmers = all_kmers['SRR1122659.fasta|NODE_1_length_767768_cov_21.1582_ID_10270']
-				length = len(kmers)
-				while x <= length -2:
-					dgraph.add_kmer_to_graph(client, kmers[x], kmers[x+1], genome)
-					x += 1
-		sg1 = dgraph.example_query(client, genome)
-		for key, value in sg1.items():
-			print(value)
+	stub = dgraph.create_client_stub()
+	client = dgraph.create_client(stub)
+	dgraph.drop_all(client)
+	dgraph.add_schema(client)
+	for filepath in files.walkdir(path):
+		with open(filepath, 'rb') as file:
+			x = 0
+			filename = file.name
+			genome = "genome_" + commandline.compute_hash(filepath)
+			dgraph.add_genome_to_schema(client, genome)
+			all_kmers = dgraph.get_kmers_files(filename, 11)
+			kmers = all_kmers['SRR1122659.fasta|NODE_1_length_767768_cov_21.1582_ID_10270']
+			length = len(kmers)
+			while x <= length -2:
+				dgraph.add_kmer_to_graph(client, kmers[x], kmers[x+1], genome)
+				x += 1
+	sg1 = dgraph.example_query(client, genome)
+	print(sg1)
+
+	x = 0
+	for keys, values in sg1.items():
+		if (x == 0):
+			kmer = values[0]
+			contig = str(sub)
+			x += 1
+		else:
+			kmer = values[x]
+			contig.append(sub[10])
+			x += 1
+
+		print(contig)
+
+	with open(path + "/test.fasta", "r") as f:
+		for record in SeqIO.parse(f, "fasta"):
+			sequence = record.seq
+			print(sequence)
+
+	assert contig == str(sequence)
