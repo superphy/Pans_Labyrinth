@@ -504,8 +504,16 @@ def create_graph(client, file, filepath):
 			dgraph.add_kmer_to_graph(client, kmers[x], kmers[x+1], genome)
 			x += 1
 		LOG.info("Finished creating the graph")
-		#sg1 = dgraph.example_query(client, genome)
-		#print(sg1)
+		sg1 = dgraph.example_query(client, genome)
+		value = sg1["genome"]
+		klist = []
+		for counter, x in enumerate(value):
+			temp = value[counter]
+			klist.append(temp["kmer"])
+		first, *rest = klist
+		ends = [kmer[-1] for kmer in rest]
+		contig = ''.join([first] + ends)
+		print(contig)
 	except:
 		LOG.critical("Failed to create graph at file - {}".format(filename))
 		sys.exit()

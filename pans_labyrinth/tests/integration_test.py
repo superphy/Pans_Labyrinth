@@ -78,20 +78,14 @@ def test_verify_contig():
 				dgraph.add_kmer_to_graph(client, kmers[x], kmers[x+1], genome)
 				x += 1
 	sg1 = dgraph.example_query(client, genome)
-	print(sg1)
-
-	x = 0
-	for keys, values in sg1.items():
-		if (x == 0):
-			kmer = values[0]
-			contig = str(sub)
-			x += 1
-		else:
-			kmer = values[x]
-			contig.append(sub[10])
-			x += 1
-
-		print(contig)
+	value = sg1["genome"]
+	klist = []
+	for counter, x in enumerate(value):
+		temp = value[counter]
+		klist.append(temp["kmer"])
+	first, *rest = klist
+	ends = [kmer[-1] for kmer in rest]
+	contig = ''.join([first] + ends)
 
 	with open(path + "/test.fasta", "r") as f:
 		for record in SeqIO.parse(f, "fasta"):
