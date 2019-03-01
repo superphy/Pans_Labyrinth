@@ -136,6 +136,7 @@ def example_query(client, genome):
 	res = client.query(query)
 	#print(res)
 	j_res = json.loads(res.json)
+	#print(j_res)
 
 
 	# In the graph A-p->B-p->C has(p) will return the uid for A and B, but not C
@@ -225,12 +226,15 @@ def add_kmers_dgraph(client, all_kmers, genome):
 
 	# query a batch of kmers in bulk and get the uids if they exist
 	pc = partial(get_kmers_contig, client=client, genome=genome)
-
+	dict_values = all_kmers.values()
+	kmers = list(dict_values)
+	kmer_list = kmers[0]
 	with ThreadPoolExecutor(max_workers=12) as ex:
-		res = ex.map(pc, all_kmers.values())
-
+		res = ex.map(pc, kmer_list)
+	print(res)
 	all_quads = []
 	for r in res:
+		print(r)
 		all_quads += r
 
 	# Start the transaction
@@ -485,7 +489,7 @@ def create_graph(client, file, filepath):
 	"""
 	This function builds the graph by being repeatedly called by the main function.
 	A path to a fasta file to be inserted is given and the function breaks the file up into its
-	kmers adn then adds those kmers to the graph with the genome name as an edge.
+	kmers and then adds those kmers to the graph with the genome name as an edge.
 	:param client: The dgraph client
 	:param file: The opened fasta file
 	:param filepath: The absolute path to the fasta file which is being inserted
@@ -497,12 +501,14 @@ def create_graph(client, file, filepath):
 	genome = "genome_" + commandline.compute_hash(filepath)
 	dgraph.add_genome_to_schema(client, genome)
 	all_kmers = dgraph.get_kmers_files(filename, 11)
+	#print(all_kmers)
 	kmers = all_kmers['SRR1122659.fasta|NODE_1_length_767768_cov_21.1582_ID_10270']
-	#dgraph.add_kmers_dgraph(client, all_kmers, genome)
-	length = len(kmers)
-	while x <= length -2:
-		dgraph.add_kmer_to_graph(client, kmers[x], kmers[x+1], genome)
-		x += 1
+
+	dgraph.add_kmers_dgraph(client, all_kmers, genome)
+	#length = len(kmers)
+	#while x <= length -2:
+		#dgraph.add_kmer_to_graph(client, kmers[x], kmers[x+1], genome)
+		#x += 1
 	LOG.info("Finished creating the graph")
 	sg1 = dgraph.example_query(client, genome)
 	print(sg1[-1])
