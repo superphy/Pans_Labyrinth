@@ -224,29 +224,11 @@ def add_kmers_dgraph(client, all_kmers, genome):
 	:return: None
 	"""
 
-	# query a batch of kmers in bulk and get the uids if they exist
-	pc = partial(get_kmers_contig, client=client, genome=genome)
 	dict_values = all_kmers.values()
 	kmers = list(dict_values)
 	kmer_list = kmers[0]
-	with ThreadPoolExecutor(max_workers=12) as ex:
-		res = ex.map(pc, kmer_list)
-	print(res)
-	all_quads = []
-	for r in res:
-		print(r)
-		all_quads += r
 
-	# Start the transaction
-	txn = client.txn()
-
-	try:
-		txn.mutate(set_nquads=''.join(all_quads))
-		txn.commit()
-
-	finally:
-		txn.discard()
-
+	get_kmers_contig(kmer_list, client, genome)
 
 def get_kmers_contig(ckmers, client, genome):
 	"""
@@ -299,6 +281,7 @@ def add_edges_kmers(client, kmers, kmer_uid_dict, genome):
 														  kmer_uid_dict[kmers[i + 1]],
 														  "\n"
 														  ))
+
 	# Start the transaction
 	txn = client.txn()
 
@@ -322,6 +305,7 @@ def add_kmers_batch_dgraph(client, kmer_list):
 	bulk_quads = []
 	for kmer in kmer_list:
 		bulk_quads.append('_:{0} <kmer> "{0}" .{1}'.format(kmer, "\n"))
+
 
 	# start the transaction
 	txn = client.txn()
@@ -511,16 +495,18 @@ def create_graph(client, file, filepath):
 		#x += 1
 	LOG.info("Finished creating the graph")
 	sg1 = dgraph.example_query(client, genome)
-	print(sg1[-1])
+	kmer_list = []
 	for x in sg1:
 		if x == sg1[-1]:
 			dict = sg1[-1]
-			value = dict.values()
-			kmer = value["kmer"]
-			print(kmer)
+			value = list(dict.values())
+			kmer = value[0]
+			last_kmer = kmer[0]
+			kmer_list.append(last_kmer["kmer"])
 		else:
 			kmer = x["kmer"]
-			print(kmer)
+			kmer_list.append(kmer)
+	print(kmer_list)
 	#except:
 		#LOG.critical("Failed to create graph at file - {}".format(filename))
 		#sys.exit()
