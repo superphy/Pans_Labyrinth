@@ -225,6 +225,7 @@ def add_kmers_dgraph(client, all_kmers, genome):
 	"""
 
 	dict_values = all_kmers.values()
+	#print(dict_values)
 	kmers = list(dict_values)
 	kmer_list = kmers[0]
 
@@ -281,7 +282,7 @@ def add_edges_kmers(client, kmers, kmer_uid_dict, genome):
 														  kmer_uid_dict[kmers[i + 1]],
 														  "\n"
 														  ))
-
+	#print(bulk_quads)
 	# Start the transaction
 	txn = client.txn()
 
@@ -305,7 +306,7 @@ def add_kmers_batch_dgraph(client, kmer_list):
 	bulk_quads = []
 	for kmer in kmer_list:
 		bulk_quads.append('_:{0} <kmer> "{0}" .{1}'.format(kmer, "\n"))
-
+	#print(bulk_quads)
 
 	# start the transaction
 	txn = client.txn()
@@ -478,35 +479,31 @@ def create_graph(client, file, filepath):
 	:param file: The opened fasta file
 	:param filepath: The absolute path to the fasta file which is being inserted
 	"""
-	#try:
-	LOG.info("Starting to create graph")
-	x = 0
-	filename = file.name
-	genome = "genome_" + commandline.compute_hash(filepath)
-	dgraph.add_genome_to_schema(client, genome)
-	all_kmers = dgraph.get_kmers_files(filename, 11)
-	#print(all_kmers)
-	kmers = all_kmers['SRR1122659.fasta|NODE_1_length_767768_cov_21.1582_ID_10270']
+	try:
+		LOG.info("Starting to create graph")
+		x = 0
+		filename = file.name
+		genome = "genome_" + commandline.compute_hash(filepath)
+		dgraph.add_genome_to_schema(client, genome)
+		all_kmers = dgraph.get_kmers_files(filename, 11)
+		#print(all_kmers)
+		kmers = all_kmers['SRR1122659.fasta|NODE_1_length_767768_cov_21.1582_ID_10270']
 
-	dgraph.add_kmers_dgraph(client, all_kmers, genome)
-	#length = len(kmers)
-	#while x <= length -2:
-		#dgraph.add_kmer_to_graph(client, kmers[x], kmers[x+1], genome)
-		#x += 1
-	LOG.info("Finished creating the graph")
-	sg1 = dgraph.example_query(client, genome)
-	kmer_list = []
-	for x in sg1:
-		if x == sg1[-1]:
-			dict = sg1[-1]
-			value = list(dict.values())
-			kmer = value[0]
-			last_kmer = kmer[0]
-			kmer_list.append(last_kmer["kmer"])
-		else:
-			kmer = x["kmer"]
-			kmer_list.append(kmer)
-	print(kmer_list)
-	#except:
-		#LOG.critical("Failed to create graph at file - {}".format(filename))
-		#sys.exit()
+		dgraph.add_kmers_dgraph(client, all_kmers, genome)
+		LOG.info("Finished creating the graph")
+		sg1 = dgraph.example_query(client, genome)
+		kmer_list = []
+		for x in sg1:
+			if x == sg1[-1]:
+				dict = sg1[-1]
+				value = list(dict.values())
+				kmer = value[0]
+				last_kmer = kmer[0]
+				kmer_list.append(last_kmer["kmer"])
+			else:
+				kmer = x["kmer"]
+				kmer_list.append(kmer)
+		#print(kmer_list)
+	except:
+		LOG.critical("Failed to create graph at file - {}".format(filename))
+		sys.exit()
