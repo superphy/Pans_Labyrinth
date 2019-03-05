@@ -40,7 +40,24 @@ def test_query():
 
 #def test_deletion(): #TODO for the command line arguments
 
-#def hash_verification(): #TODO verify the hash of a genome
+def test_hash_verification():
+	path = os.path.abspath("pans_labyrinth/tests/data/contig_test")
+	stub = dgraph.create_client_stub()
+	client = dgraph.create_client(stub)
+	dgraph.drop_all(client)
+	dgraph.add_schema(client)
+	for filepath in files.walkdir(path):
+		with open(filepath, 'rb') as file:
+			x = 0
+			filename = file.name
+			genome = "genome_" + commandline.compute_hash(filepath)
+			dgraph.add_genome_to_schema(client, genome)
+			all_kmers = dgraph.get_kmers_files(filename, 11)
+			dgraph.add_kmers_dgraph(client, all_kmers, genome)
+
+	assert genome == "genome_" + commandline.compute_hash(filepath)	
+
+
 
 def test_no_file():
 	"""
@@ -76,7 +93,7 @@ def test_non_fasta():
 				dgraph.create_graph(client, file, filepath)
 	assert se.type == SystemExit
 
-def test_verify_contig(): # TODO bulk load kmers
+def test_verify_contig():
 	"""
 	A test to verify that the kmers
 	"""
@@ -94,11 +111,7 @@ def test_verify_contig(): # TODO bulk load kmers
 			genome = "genome_" + commandline.compute_hash(filepath)
 			dgraph.add_genome_to_schema(client, genome)
 			all_kmers = dgraph.get_kmers_files(filename, 11)
-			kmers = all_kmers['SRR1122659.fasta|NODE_1_length_767768_cov_21.1582_ID_10270']
-			length = len(kmers)
-			while x <= length -2:
-				dgraph.add_kmer_to_graph(client, kmers[x], kmers[x+1], genome)
-				x += 1
+			dgraph.add_kmers_dgraph(client, all_kmers, genome)
 
 	#Query graph and put all kmers into a list
 	sg1 = dgraph.example_query(client, genome)
