@@ -15,20 +15,26 @@ def test_query():
 	dgraph.drop_all(client)
 	dgraph.add_schema(client)
 	dgraph.add_genome_to_schema(client, "test_genome")
-	kmers = ["AAAA", "TTTT", "CCCC", "GGGG"]
-	length = len(kmers)
-	x = 0
-	while x <= length -2:
-		dgraph.add_kmer_to_graph(client, kmers[x], kmers[x+1], "test_genome")
-		x += 1
+
+	kmers = {"genome" : ["AAAA", "TTTT", "CCCC", "GGGG"]}
+	dgraph.add_kmers_dgraph(client, kmers, "test_genome")
+
 	sg1 = dgraph.example_query(client, "test_genome")
-	value = sg1["genome"]
-	klist = []
-	for counter, x in enumerate(value):
-		temp = value[counter]
-		klist.append(temp["kmer"])
-	for i, x in enumerate(klist):
-		assert x == kmers[i]
+
+	kmer_list = []
+	for x in sg1:
+		if x == sg1[-1]:
+			dict = sg1[-1]
+			value = list(dict.values())
+			kmer = value[0]
+			last_kmer = kmer[0]
+			kmer_list.append(last_kmer["kmer"])
+		else:
+			kmer = x["kmer"]
+			kmer_list.append(kmer)
+	print(kmer_list)
+	for i, x in enumerate(kmer_list):
+		assert x == kmers["genome"][i]
 
 #def test_insertion(): #TODO for the command line arguments
 
@@ -96,15 +102,23 @@ def test_verify_contig(): # TODO bulk load kmers
 
 	#Query graph and put all kmers into a list
 	sg1 = dgraph.example_query(client, genome)
-	value = sg1["genome"]
-	klist = []
-	for counter, x in enumerate(value):
-		temp = value[counter]
-		klist.append(temp["kmer"])
+
+	kmer_list = []
+	for x in sg1:
+		if x == sg1[-1]:
+			dict = sg1[-1]
+			value = list(dict.values())
+			kmer = value[0]
+			last_kmer = kmer[0]
+			kmer_list.append(last_kmer["kmer"])
+		else:
+			kmer = x["kmer"]
+			kmer_list.append(kmer)
+	#print(kmer_list)
 
 	#Gets the whole first kmer in the list and then the last character of the rest of the kmers in the list
 	#Creates a string representing the contig
-	first, *rest = klist
+	first, *rest = kmer_list
 	ends = [kmer[-1] for kmer in rest]
 	contig = ''.join([first] + ends)
 

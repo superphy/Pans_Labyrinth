@@ -486,7 +486,7 @@ def create_graph(client, file, filepath):
 		genome = "genome_" + commandline.compute_hash(filepath)
 		dgraph.add_genome_to_schema(client, genome)
 		all_kmers = dgraph.get_kmers_files(filename, 11)
-		#print(all_kmers)
+		print(all_kmers)
 		kmers = all_kmers['SRR1122659.fasta|NODE_1_length_767768_cov_21.1582_ID_10270']
 
 		dgraph.add_kmers_dgraph(client, all_kmers, genome)
