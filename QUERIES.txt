@@ -88,8 +88,20 @@ The same as the other expand query but without all the clutter.
   }
 }
 
+Still being flushed out but getting close
+{
+  var(func:allofterms(kmer, "AATTAAAACGT")) {
+    pred as _predicate_
+  }
+
+  q(func: has(kmer), first: 10) {
+    expand(val(pred)) { expand(_all_) }
+  }
+}
+
+
 PROBLEMS:
 - UIDs are not in order but kmers are connected correctly. When querying the root kmer is
 known the path is correct but when querying the root UID the path is incorrect. Still flushing
 this idea out.
-- Querying an entire path without nesting a million expands. 
+- Querying an entire path without nesting a million expands.
