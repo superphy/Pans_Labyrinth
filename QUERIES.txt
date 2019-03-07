@@ -1,0 +1,95 @@
+Given a root UID this query gets the UID, kmer, and genome edges. By nesting
+with the genome edge we can ge the next genome on the path along with its edges.
+{
+  complete(func: uid(0x305847)){
+  uid
+  kmer
+  genome_3e3b8156bf92d835217c959bf07d0c8d1d7abe54{
+    uid
+    kmer
+    genome_3e3b8156bf92d835217c959bf07d0c8d1d7abe54{
+      uid
+      kmer
+      genome_3e3b8156bf92d835217c959bf07d0c8d1d7abe54{
+        uid
+        kmer
+        genome_3e3b8156bf92d835217c959bf07d0c8d1d7abe54{
+          kmer
+        	}
+      	}
+      }
+    }
+  }
+}
+
+This query is similar to the first but uses expand to get the names of the connected
+edges.
+{
+  expanded(func: uid(0x305847)){
+    kmer
+    uid
+    genome_3e3b8156bf92d835217c959bf07d0c8d1d7abe54{
+      uid
+      expand(_all_){
+        expand(_all_){
+          expand(_all_)
+        }
+      }
+    }
+  }
+}
+
+This query has not been tested but I thought could be useful in the future. The idea is that
+given a UID we can look to see what possible paths there are. Expanding the cycle_paths edge
+could show which directions are possible maybe by storing UIDs as strings and then using that
+string as a variable for which node to look at next.
+{
+  metadata(func: uid(0x305847)){
+    cycle_paths{
+      expand(_all_)
+    }
+  }
+}
+
+Searches for a kmer which is given a a string. Then shows the adjacent node and its
+relevant information etc.
+{
+  kmer_search(func: allofterms(kmer, "AATTAAAACGT")){
+    uid
+    genome_3e3b8156bf92d835217c959bf07d0c8d1d7abe54{
+      uid
+      kmer
+      genome_3e3b8156bf92d835217c959bf07d0c8d1d7abe54{
+        uid
+        kmer
+      }
+    }
+  }
+}
+
+Searching for a kmer given as a string then returning all predicates. All edge names
+are returned by predicate.
+{
+  kmer_predicate_search(func: allofterms(kmer, "AATTAAAACGT")){
+   _predicate_
+  }
+}
+
+The same as the other expand query but without all the clutter.
+{
+  expanded2(func: uid(0x305847)){
+    expand(_all_){
+      expand(_all_){
+        expand(_all_){
+          expand(_all_)
+        }
+      }
+    }
+  }
+}
+
+PROBLEMS:
+- UIDs are not in order but kmers are connected correctly. When querying the root kmer is
+known the path is correct but when querying the root UID the path is incorrect. Still flushing
+this idea out.
+- Querying an entire path without nesting a million expands. 

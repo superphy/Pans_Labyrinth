@@ -225,11 +225,10 @@ def add_kmers_dgraph(client, all_kmers, genome):
 	"""
 
 	dict_values = all_kmers.values()
-	#print(dict_values)
 	kmers = list(dict_values)
-	kmer_list = kmers[0]
-
-	get_kmers_contig(kmer_list, client, genome)
+	for x, i in enumerate(kmers):
+		kmer_list = kmers[x]
+		get_kmers_contig(kmer_list, client, genome)
 
 def get_kmers_contig(ckmers, client, genome):
 	"""
@@ -248,11 +247,10 @@ def get_kmers_contig(ckmers, client, genome):
 	for kmer in ckmers:
 		if kmer not in kmer_uid_dict:
 			kmers_to_insert.append(kmer)
-
+	#print(kmers_to_insert)
 	if kmers_to_insert:
 		# Bulk insert the kmers
 		txn_result_dict = add_kmers_batch_dgraph(client, kmers_to_insert)
-
 		# Update the dict of kmer:uid
 		kmer_uid_dict = add_kmers_dict(kmer_uid_dict, txn_result_dict)
 
@@ -281,7 +279,9 @@ def add_edges_kmers(client, kmers, kmer_uid_dict, genome):
 														  genome,
 														  kmer_uid_dict[kmers[i + 1]],
 														  "\n"
-														  ))
+													  ))
+
+
 	#print(bulk_quads)
 	# Start the transaction
 	txn = client.txn()
@@ -314,14 +314,12 @@ def add_kmers_batch_dgraph(client, kmer_list):
 	try:
 		m = txn.mutate(set_nquads=''.join(bulk_quads))
 		txn.commit()
-
 		# Create the output in the form that the program is expecting
 		kmer_dict_list = []
 		for uid in m.uids:
 			kmer_dict_list.append({'kmer': uid, 'uid': m.uids[uid]})
 	finally:
 		txn.discard()
-
 	return kmer_dict_list
 
 def add_kmer_to_graph(client, ki, kn, genome):
@@ -484,14 +482,14 @@ def create_graph(client, file, filepath):
 		x = 0
 		filename = file.name
 		genome = "genome_" + commandline.compute_hash(filepath)
+		print(genome)
 		dgraph.add_genome_to_schema(client, genome)
 		all_kmers = dgraph.get_kmers_files(filename, 11)
-		print(all_kmers)
-		kmers = all_kmers['SRR1122659.fasta|NODE_1_length_767768_cov_21.1582_ID_10270']
 
 		dgraph.add_kmers_dgraph(client, all_kmers, genome)
 		LOG.info("Finished creating the graph")
 		sg1 = dgraph.example_query(client, genome)
+		print(sg1)
 		kmer_list = []
 		for x in sg1:
 			if x == sg1[-1]:
