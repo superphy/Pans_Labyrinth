@@ -88,15 +88,36 @@ The same as the other expand query but without all the clutter.
   }
 }
 
-Still being flushed out but getting close
+
+#start
 {
   var(func:allofterms(kmer, "AATTAAAACGT")) {
     pred as _predicate_
   }
 
-  q(func: has(kmer), first: 10) {
+  q(func: has(kmer), first: 4) {
+  uid
     expand(val(pred)) { expand(_all_) }
   }
+}
+#stop
+
+
+{
+  q_search(func: allofterms(kmer, "AATTAAAACGT")){
+    uid
+    _path_
+  }
+}
+
+THE PATHING QUERY FROM NODE TO NODE
+{
+ path as shortest(from: 0x305847, to: 0x305906){
+   genome_3e3b8156bf92d835217c959bf07d0c8d1d7abe54
+ }
+   path(func: uid(path)){
+     kmer
+   }
 }
 
 
