@@ -161,6 +161,27 @@ def example_query(client, genome):
 
 	return j_res['genome'] + j_l_res['lq']
 
+def path_query(client, genome):
+	print("before query")
+	query = """
+	{{
+	  genome(func: has({0})){{
+	    uid
+	    kmer
+	    {0}{{
+	      uid
+	      kmer
+	    }}
+	  }}
+	}}
+	""".format(genome)
+	print("after query")
+	# This gets all but the last uid in the format {genome: [{'uid':'0x335'}, {'uid':'0x336'}]}
+	res = client.query(query)
+	#print(res)
+	p_res = json.loads(res.json)
+	path_list = p_res["genome"]
+	print(path_list[0])
 
 def add_genome_to_schema(client, genome):
 	"""
@@ -482,14 +503,14 @@ def create_graph(client, file, filepath):
 		x = 0
 		filename = file.name
 		genome = "genome_" + commandline.compute_hash(filepath)
-		print(genome)
+		#print(genome)
 		dgraph.add_genome_to_schema(client, genome)
 		all_kmers = dgraph.get_kmers_files(filename, 11)
 
 		dgraph.add_kmers_dgraph(client, all_kmers, genome)
 		LOG.info("Finished creating the graph")
 		sg1 = dgraph.example_query(client, genome)
-		print(sg1)
+		#print(sg1)
 		kmer_list = []
 		for x in sg1:
 			if x == sg1[-1]:
@@ -501,7 +522,7 @@ def create_graph(client, file, filepath):
 			else:
 				kmer = x["kmer"]
 				kmer_list.append(kmer)
-		#print(kmer_list)
+		path_query(client, genome)
 	except:
 		LOG.critical("Failed to create graph at file - {}".format(filename))
 		sys.exit()
