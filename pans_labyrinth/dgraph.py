@@ -162,26 +162,68 @@ def example_query(client, genome):
 	return j_res['genome'] + j_l_res['lq']
 
 def path_query(client, genome):
-	print("before query")
 	query = """
 	{{
 	  genome(func: has({0})){{
-	    uid
-	    kmer
-	    {0}{{
-	      uid
-	      kmer
-	    }}
+		uid
+		kmer
+		{0}{{
+		  uid
+		  kmer
+		}}
 	  }}
 	}}
 	""".format(genome)
-	print("after query")
 	# This gets all but the last uid in the format {genome: [{'uid':'0x335'}, {'uid':'0x336'}]}
 	res = client.query(query)
 	#print(res)
 	p_res = json.loads(res.json)
+
 	path_list = p_res["genome"]
-	print(path_list[0])
+	first_uid = path_list[0]["uid"]
+	second_uid = path_list[0][genome][0]["uid"]
+	uid_dict = {}
+	uid_list = []
+	start_stop_list = []
+
+	for x, i in enumerate(path_list):
+		first_uid = path_list[x]["uid"]
+		second_uid = path_list[x][genome][0]["uid"]
+		uid_list.append(first_uid)
+		uid_list.append(second_uid)
+
+	for key in uid_list:
+		if key in uid_dict:
+			uid_dict[key] += 1
+		else:
+			uid_dict[key] = 1
+
+	for key in uid_dict.keys():
+		if uid_dict[key] == 1:
+			start_stop_list.append(key)
+
+	path_query = """
+	{{
+	 path as shortest(from: {0}, to: {1}){{
+	   {2}
+	 }}
+	   path(func: uid(path)){{
+	     kmer
+	   }}
+	}}
+	""".format(start_stop_list[1], start_stop_list[0], genome)
+	res = client.query(query)
+	#print(res)
+	path_res = json.loads(res.json)
+
+	quick_list = []
+	for i, x in enumerate(path_res):
+		kmer1 = path_res["genome"][i]["kmer"]
+		kmer2 = path_res["genome"][i][genome][0]["kmer"]
+		print(kmer1, kmer2)
+		quick_list.append(kmer1)
+		quick_list.append(kmer2)
+	print(quick_list)
 
 def add_genome_to_schema(client, genome):
 	"""
