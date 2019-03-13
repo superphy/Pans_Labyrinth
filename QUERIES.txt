@@ -110,7 +110,9 @@ The same as the other expand query but without all the clutter.
   }
 }
 
-THE PATHING QUERY FROM NODE TO NODE
+THE PATHING QUERY FROM NODE TO NODE. Given a start and stop UID this query will find
+the shortest path between those two UIDs. Must know what the start and stop UIDs are
+beforehand. This query is utlilized in the path_query function
 {
  path as shortest(from: 0x305847, to: 0x305906){
    genome_3e3b8156bf92d835217c959bf07d0c8d1d7abe54
@@ -119,10 +121,3 @@ THE PATHING QUERY FROM NODE TO NODE
      kmer
    }
 }
-
-
-PROBLEMS:
-- UIDs are not in order but kmers are connected correctly. When querying the root kmer is
-known the path is correct but when querying the root UID the path is incorrect. Still flushing
-this idea out.
-- Querying an entire path without nesting a million expands.

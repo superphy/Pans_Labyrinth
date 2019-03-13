@@ -55,7 +55,7 @@ def test_hash_verification():
 			all_kmers = dgraph.get_kmers_files(filename, 11)
 			dgraph.add_kmers_dgraph(client, all_kmers, genome)
 
-	assert genome == "genome_" + commandline.compute_hash(filepath)	
+	assert genome == "genome_" + commandline.compute_hash(filepath)
 
 
 
@@ -95,7 +95,8 @@ def test_non_fasta():
 
 def test_verify_contig():
 	"""
-	A test to verify that the kmers
+	A test to verify that the kmers returned from the graph are the same as the
+	kmers in the original contig
 	"""
 
 	#Create graph and fill it with kmers from a fasta file
@@ -114,20 +115,13 @@ def test_verify_contig():
 			dgraph.add_kmers_dgraph(client, all_kmers, genome)
 
 	#Query graph and put all kmers into a list
-	sg1 = dgraph.example_query(client, genome)
+	sg1 = dgraph.path_query(client, genome)
 
 	kmer_list = []
-	for x in sg1:
-		if x == sg1[-1]:
-			dict = sg1[-1]
-			value = list(dict.values())
-			kmer = value[0]
-			last_kmer = kmer[0]
-			kmer_list.append(last_kmer["kmer"])
-		else:
-			kmer = x["kmer"]
-			kmer_list.append(kmer)
-	#print(kmer_list)
+	for i, x in enumerate(sg1["path"]):
+		kmer = sg1["path"][i]["kmer"]
+		kmer_list.append(kmer)
+	print(kmer_list)
 
 	#Gets the whole first kmer in the list and then the last character of the rest of the kmers in the list
 	#Creates a string representing the contig

@@ -162,6 +162,14 @@ def example_query(client, genome):
 	return j_res['genome'] + j_l_res['lq']
 
 def path_query(client, genome):
+	"""
+	A query to return the proper path of a genome through the graph using the
+	genome name to traverse the edges.
+	:param client: the dgraph client
+	:param genome: the genome in name in the form genome_hash
+	:return: A dictionary converted from a JSON object which is the query returned by dgraph
+	"""
+
 	query = """
 	{{
 	  genome(func: has({0})){{
@@ -174,14 +182,12 @@ def path_query(client, genome):
 	  }}
 	}}
 	""".format(genome)
-	# This gets all but the last uid in the format {genome: [{'uid':'0x335'}, {'uid':'0x336'}]}
+
 	res = client.query(query)
-	#print(res)
 	p_res = json.loads(res.json)
 
 	path_list = p_res["genome"]
-	first_uid = path_list[0]["uid"]
-	second_uid = path_list[0][genome][0]["uid"]
+
 	uid_dict = {}
 	uid_list = []
 	start_stop_list = []
@@ -202,7 +208,18 @@ def path_query(client, genome):
 		if uid_dict[key] == 1:
 			start_stop_list.append(key)
 
-	path_query = """
+	query1 = """
+	{{
+	 path as shortest(from: {0}, to: {1}){{
+	   {2}
+	 }}
+	   path(func: uid(path)){{
+	     kmer
+	   }}
+	}}
+	""".format(start_stop_list[0], start_stop_list[1], genome)
+
+	query2 = """
 	{{
 	 path as shortest(from: {0}, to: {1}){{
 	   {2}
@@ -212,18 +229,29 @@ def path_query(client, genome):
 	   }}
 	}}
 	""".format(start_stop_list[1], start_stop_list[0], genome)
-	res = client.query(query)
-	#print(res)
-	path_res = json.loads(res.json)
 
-	quick_list = []
-	for i, x in enumerate(path_res):
-		kmer1 = path_res["genome"][i]["kmer"]
-		kmer2 = path_res["genome"][i][genome][0]["kmer"]
-		print(kmer1, kmer2)
-		quick_list.append(kmer1)
-		quick_list.append(kmer2)
-	print(quick_list)
+	res1 = client.query(query1)
+	path_res1 = json.loads(res1.json)
+
+	res2 = client.query(query2)
+	path_res2 = json.loads(res2.json)
+
+	kmer_list1 = []
+	for i, x in enumerate(path_res1["path"]):
+		kmer = path_res1["path"][i]["kmer"]
+		kmer_list1.append(kmer)
+	print(kmer_list1)
+
+	kmer_list2 = []
+	for i, x in enumerate(path_res2["path"]):
+		kmer = path_res2["path"][i]["kmer"]
+		kmer_list2.append(kmer)
+	print(kmer_list2)
+
+	if len(kmer_list1) == 0:
+		return path_res2
+	else:
+		return path_res1
 
 def add_genome_to_schema(client, genome):
 	"""
