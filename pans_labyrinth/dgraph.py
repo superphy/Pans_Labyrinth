@@ -184,10 +184,12 @@ def path_query(client, genome):
 	""".format(genome)
 
 	res = client.query(query)
+	print(res)
 	p_res = json.loads(res.json)
+	#print(p_res)
 
 	path_list = p_res["genome"]
-
+	#print(path_list)
 	uid_dict = {}
 	uid_list = []
 	start_stop_list = []
@@ -195,6 +197,7 @@ def path_query(client, genome):
 	for x, i in enumerate(path_list):
 		first_uid = path_list[x]["uid"]
 		second_uid = path_list[x][genome][0]["uid"]
+		#print(first_uid, second_uid)
 		uid_list.append(first_uid)
 		uid_list.append(second_uid)
 
@@ -203,10 +206,29 @@ def path_query(client, genome):
 			uid_dict[key] += 1
 		else:
 			uid_dict[key] = 1
+	#print(uid_dict)
 
 	for key in uid_dict.keys():
 		if uid_dict[key] == 1:
 			start_stop_list.append(key)
+	first = start_stop_list[0]
+	second = start_stop_list[1]
+	#print(start_stop_list)
+
+	for x, i in enumerate(path_list):
+		first_uid = path_list[x]["uid"]
+		second_uid = path_list[x][genome][0]["uid"]
+		if first_uid == first:
+			print(path_list[x]["uid"], path_list[x][genome][0]["uid"])
+		if second_uid == second:
+			print(path_list[x]["uid"], path_list[x][genome][0]["uid"])
+
+	if first < second:
+		start = first
+		stop = second
+	else:
+		start = second
+		stop = first
 
 	query1 = """
 	{{
@@ -217,41 +239,24 @@ def path_query(client, genome):
 	     kmer
 	   }}
 	}}
-	""".format(start_stop_list[0], start_stop_list[1], genome)
-
-	query2 = """
-	{{
-	 path as shortest(from: {0}, to: {1}){{
-	   {2}
-	 }}
-	   path(func: uid(path)){{
-	     kmer
-	   }}
-	}}
-	""".format(start_stop_list[1], start_stop_list[0], genome)
+	""".format(start, stop, genome)
 
 	res1 = client.query(query1)
 	path_res1 = json.loads(res1.json)
+	#print(path_res1)
 
-	res2 = client.query(query2)
-	path_res2 = json.loads(res2.json)
+	#res2 = client.query(query2)
+	#path_res2 = json.loads(res2.json)
+	#print(path_res2, '\n')
 
 	kmer_list1 = []
 	for i, x in enumerate(path_res1["path"]):
 		kmer = path_res1["path"][i]["kmer"]
 		kmer_list1.append(kmer)
-	print(kmer_list1)
+	#print(kmer_list1)
 
-	kmer_list2 = []
-	for i, x in enumerate(path_res2["path"]):
-		kmer = path_res2["path"][i]["kmer"]
-		kmer_list2.append(kmer)
-	print(kmer_list2)
-
-	if len(kmer_list1) == 0:
-		return path_res2
-	else:
-		return path_res1
+	#print(path_res1)
+	return path_res1
 
 def add_genome_to_schema(client, genome):
 	"""
