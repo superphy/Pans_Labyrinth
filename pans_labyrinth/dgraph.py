@@ -184,12 +184,9 @@ def path_query(client, genome):
 	""".format(genome)
 
 	res = client.query(query)
-	print(res)
 	p_res = json.loads(res.json)
-	#print(p_res)
 
 	path_list = p_res["genome"]
-	#print(path_list)
 	uid_dict = {}
 	uid_list = []
 	start_stop_list = []
@@ -197,7 +194,6 @@ def path_query(client, genome):
 	for x, i in enumerate(path_list):
 		first_uid = path_list[x]["uid"]
 		second_uid = path_list[x][genome][0]["uid"]
-		#print(first_uid, second_uid)
 		uid_list.append(first_uid)
 		uid_list.append(second_uid)
 
@@ -206,29 +202,21 @@ def path_query(client, genome):
 			uid_dict[key] += 1
 		else:
 			uid_dict[key] = 1
-	#print(uid_dict)
 
 	for key in uid_dict.keys():
 		if uid_dict[key] == 1:
 			start_stop_list.append(key)
 	first = start_stop_list[0]
 	second = start_stop_list[1]
-	#print(start_stop_list)
 
 	for x, i in enumerate(path_list):
 		first_uid = path_list[x]["uid"]
-		second_uid = path_list[x][genome][0]["uid"]
 		if first_uid == first:
-			print(path_list[x]["uid"], path_list[x][genome][0]["uid"])
-		if second_uid == second:
-			print(path_list[x]["uid"], path_list[x][genome][0]["uid"])
-
-	if first < second:
-		start = first
-		stop = second
-	else:
-		start = second
-		stop = first
+			start = first
+			stop = second
+		if first_uid == second:
+			start = second
+			stop = first
 
 	query1 = """
 	{{
@@ -243,19 +231,12 @@ def path_query(client, genome):
 
 	res1 = client.query(query1)
 	path_res1 = json.loads(res1.json)
-	#print(path_res1)
-
-	#res2 = client.query(query2)
-	#path_res2 = json.loads(res2.json)
-	#print(path_res2, '\n')
 
 	kmer_list1 = []
 	for i, x in enumerate(path_res1["path"]):
 		kmer = path_res1["path"][i]["kmer"]
 		kmer_list1.append(kmer)
-	#print(kmer_list1)
 
-	#print(path_res1)
 	return path_res1
 
 def add_genome_to_schema(client, genome):
@@ -585,7 +566,6 @@ def create_graph(client, file, filepath):
 		dgraph.add_kmers_dgraph(client, all_kmers, genome)
 		LOG.info("Finished creating the graph")
 		sg1 = dgraph.example_query(client, genome)
-		#print(sg1)
 		kmer_list = []
 		for x in sg1:
 			if x == sg1[-1]:
@@ -597,7 +577,8 @@ def create_graph(client, file, filepath):
 			else:
 				kmer = x["kmer"]
 				kmer_list.append(kmer)
-		path_query(client, genome)
-	except:
-		LOG.critical("Failed to create graph at file - {}".format(filename))
+		sg1 = path_query(client, genome)
+		print(sg1)
+	except Exception as e:
+		LOG.critical("Failed to create graph at file - {}".format(filename) + str(e))
 		sys.exit()
