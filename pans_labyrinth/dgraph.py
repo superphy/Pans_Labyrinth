@@ -202,10 +202,13 @@ def path_query(client, genome):
 			uid_dict[key] += 1
 		else:
 			uid_dict[key] = 1
+	print(uid_dict)
 
 	for key in uid_dict.keys():
 		if uid_dict[key] == 1:
 			start_stop_list.append(key)
+	print(start_stop_list)
+
 	first = start_stop_list[0]
 	second = start_stop_list[1]
 
@@ -238,6 +241,12 @@ def path_query(client, genome):
 		kmer_list1.append(kmer)
 
 	return path_res1
+
+
+def add_metadata_to_schema(client, edge_name):
+	schema = """
+	{0}: string
+	""".format(edge_name)
 
 def add_genome_to_schema(client, genome):
 	"""
@@ -559,6 +568,7 @@ def create_graph(client, file, filepath):
 		x = 0
 		filename = file.name
 		genome = "genome_" + commandline.compute_hash(filepath)
+		dgraph.add_metadata_to_schema(client, genome)
 		dgraph.add_genome_to_schema(client, genome)
 		all_kmers = dgraph.get_kmers_files(filename, 11)
 
