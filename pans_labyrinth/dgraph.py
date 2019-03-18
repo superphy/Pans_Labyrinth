@@ -559,7 +559,6 @@ def create_graph(client, file, filepath):
 		x = 0
 		filename = file.name
 		genome = "genome_" + commandline.compute_hash(filepath)
-		#print(genome)
 		dgraph.add_genome_to_schema(client, genome)
 		all_kmers = dgraph.get_kmers_files(filename, 11)
 
