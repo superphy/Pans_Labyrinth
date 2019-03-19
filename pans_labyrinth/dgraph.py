@@ -24,6 +24,7 @@ from pans_labyrinth import files, dgraph, commandline, logging_functions
 import sys
 import logging
 import os
+from collections import Counter
 
 output_directory = os.path.abspath("data/logger")
 LOG = logging_functions.create_logger()
@@ -202,12 +203,12 @@ def path_query(client, genome):
 			uid_dict[key] += 1
 		else:
 			uid_dict[key] = 1
-	print(uid_dict)
+	#print(uid_dict)
 
 	for key in uid_dict.keys():
 		if uid_dict[key] == 1:
 			start_stop_list.append(key)
-	print(start_stop_list)
+	#print(start_stop_list)
 
 	first = start_stop_list[0]
 	second = start_stop_list[1]
@@ -241,6 +242,37 @@ def path_query(client, genome):
 		kmer_list1.append(kmer)
 
 	return path_res1
+
+def find_duplicates(client, kmer):
+	query = """
+	{{
+	  last(func: allofterms(kmer, {0})){{
+	    uid
+	  }}
+	}}
+	""".format(kmer)
+
+	res = client.query(query)
+	p_res = json.loads(res.json)
+
+	print(p_res)
+
+
+def metadata_query(client, metadata_edge, uid):
+	query = """
+	{{
+	  metadata(func: uid({0})){{
+	    {1}{
+	      expand(_all_)
+	    }}
+	  }}
+	}}
+	""".format(uid, metadata_edge)
+
+	res = client.query(query)
+	p_res = json.loads(res.json)
+
+	print(p_res)
 
 
 def add_metadata_to_schema(client, edge_name):
@@ -333,7 +365,13 @@ def get_kmers_contig(ckmers, client, genome):
 	for kmer in ckmers:
 		if kmer not in kmer_uid_dict:
 			kmers_to_insert.append(kmer)
-	#print(kmers_to_insert)
+
+	# Get a list of duplicated kmers in a contig so we can add metadata to them
+	dulplicate_list = []
+	kmers = Counter(kmers_to_insert)
+	dulplicate_list.append([i for i in kmers if kmers[i]>1])
+	print(dulplicate_list)
+
 	if kmers_to_insert:
 		# Bulk insert the kmers
 		txn_result_dict = add_kmers_batch_dgraph(client, kmers_to_insert)
@@ -568,7 +606,8 @@ def create_graph(client, file, filepath):
 		x = 0
 		filename = file.name
 		genome = "genome_" + commandline.compute_hash(filepath)
-		dgraph.add_metadata_to_schema(client, genome)
+		dgraph.add_metadata_to_schema(client, "next")
+		dgraph.add_metadata_to_schema(client, "previous")
 		dgraph.add_genome_to_schema(client, genome)
 		all_kmers = dgraph.get_kmers_files(filename, 11)
 
@@ -587,7 +626,7 @@ def create_graph(client, file, filepath):
 				kmer = x["kmer"]
 				kmer_list.append(kmer)
 		sg1 = path_query(client, genome)
-		print(sg1)
+		#print(sg1)
 	except Exception as e:
 		LOG.critical("Failed to create graph at file - {}".format(filename) + str(e))
 		sys.exit()
