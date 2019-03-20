@@ -262,7 +262,7 @@ def metadata_query(client, metadata_edge, uid):
 	query = """
 	{{
 	  metadata(func: uid({0})){{
-	    {1}{
+	    {1}{{
 	      expand(_all_)
 	    }}
 	  }}
@@ -275,10 +275,18 @@ def metadata_query(client, metadata_edge, uid):
 	print(p_res)
 
 
-def add_metadata_to_schema(client, edge_name):
+def add_metadata_to_schema(client, genome):
 	schema = """
-	{0}: string
-	""".format(edge_name)
+	{0}: uid
+	""".format(genome)
+
+	client.alter(pydgraph.Operation(schema=schema))
+
+	schema = """
+	duplicate: string @index(exact, term) .
+	"""
+
+	client.alter(pydgraph.Operation(schema=schema))
 
 def add_genome_to_schema(client, genome):
 	"""
@@ -362,15 +370,14 @@ def get_kmers_contig(ckmers, client, genome):
 
 	# Create list of kmers that need to be batch inserted into graph
 	kmers_to_insert = []
+	duplicates = []
 	for kmer in ckmers:
-		if kmer not in kmer_uid_dict:
+		if kmer in kmer_uid_dict:
+			duplicates.append(kmer)
+		else:
 			kmers_to_insert.append(kmer)
 
-	# Get a list of duplicated kmers in a contig so we can add metadata to them
-	dulplicate_list = []
-	kmers = Counter(kmers_to_insert)
-	dulplicate_list.append([i for i in kmers if kmers[i]>1])
-	print(dulplicate_list)
+	add_metadata(client, duplicates, genome)
 
 	if kmers_to_insert:
 		# Bulk insert the kmers
@@ -383,6 +390,43 @@ def get_kmers_contig(ckmers, client, genome):
 	print('.', end='')
 	return(add_edges_kmers(client, ckmers, kmer_uid_dict, genome))
 
+def add_metadata(client, duplicates, genome):
+
+	add_metadata_to_schema(client, genome)
+
+	bulk_quads = []
+
+	for i in range(0, len(duplicates) - 2):
+		bulk_quads.append('<{0}> <{1}> <{2}> .{3}'.format(kmer_uid_dict[duplicates[i]],
+														  genome,
+														  get_metadata_uid(client, "duplicate"),
+														  "\n"
+													  ))
+
+	# Start the transaction
+	txn = client.txn()
+
+	try:
+		m = txn.mutate(set_nquads=''.join(bulk_quads))
+		txn.commit()
+
+	finally:
+		txn.discard()
+
+def get_metadata_uid(client, duplicate):
+
+	bulk_quads.append('_:{0} <duplicate> "{0}" .{1}'.format(duplicate, "\n"))
+
+	txn = client.txn()
+
+	try:
+		m = txn.mutate(set_nquads=''.join(bulk_quads))
+		txn.commit()
+		for uid in m.uids:
+			print(uid)
+
+	finally:
+		txn.discard()
 
 def add_edges_kmers(client, kmers, kmer_uid_dict, genome):
 	"""
