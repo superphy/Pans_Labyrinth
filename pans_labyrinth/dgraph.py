@@ -243,22 +243,15 @@ def path_query(client, genome):
 
 	return path_res1
 
-def find_duplicates(client, kmer):
-	query = """
-	{{
-	  last(func: allofterms(kmer, {0})){{
-	    uid
-	  }}
-	}}
-	""".format(kmer)
 
-	res = client.query(query)
-	p_res = json.loads(res.json)
-
-	print(p_res)
-
-
-def metadata_query(client, metadata_edge, uid):
+def metadata_query(client, genome, uid):
+	"""
+	This function queries a uid which is known to have metadata associated with it
+	:param client: the dgrpah client
+	:param genome: the genome on the uid which you want the metadata for. Will contain
+	information about the next and previous uids in the path
+	:param uid: the uid of the node in which to look at
+	"""
 	query = """
 	{{
 	  metadata(func: uid({0})){{
@@ -267,7 +260,7 @@ def metadata_query(client, metadata_edge, uid):
 	    }}
 	  }}
 	}}
-	""".format(uid, metadata_edge)
+	""".format(uid, genome)
 
 	res = client.query(query)
 	p_res = json.loads(res.json)
@@ -276,8 +269,14 @@ def metadata_query(client, metadata_edge, uid):
 
 
 def add_metadata_to_schema(client, genome):
+	"""
+	This function adds the metadata for a certain genome to the schema. As well it adds
+	the string telling identifying that a node is a duplicate and contains metadata
+	:param client: the dgraph client
+	:param genome: the name of the genome which contains a duplicate kmer
+	"""
 	schema = """
-	{0}: uid
+	{0}: uid .
 	""".format(genome)
 
 	client.alter(pydgraph.Operation(schema=schema))
@@ -391,15 +390,23 @@ def get_kmers_contig(ckmers, client, genome):
 	return(add_edges_kmers(client, ckmers, kmer_uid_dict, genome))
 
 def add_metadata(client, duplicates, genome):
-
+	"""
+	Bulk insert of duplicated kmers metadata. Connect the uid of the kmer that exists in the graph
+	with the uid created by the metadata node. These uids are connected along a genome name edge
+	allowing for a single kmer to have multiple duplicates accross genomes.
+	:param client: the dgraph client
+	:param duplicates: a list of duplicated kmers in a contig
+	:param genome: the genome edge name that the kmers belong to
+	"""
+	print("before addition to schema")
 	add_metadata_to_schema(client, genome)
-
+	print("after addition to schema")
 	bulk_quads = []
 
 	for i in range(0, len(duplicates) - 2):
 		bulk_quads.append('<{0}> <{1}> <{2}> .{3}'.format(kmer_uid_dict[duplicates[i]],
 														  genome,
-														  get_metadata_uid(client, "duplicate"),
+														  get_metadata_uid(client),
 														  "\n"
 													  ))
 
@@ -413,8 +420,15 @@ def add_metadata(client, duplicates, genome):
 	finally:
 		txn.discard()
 
-def get_metadata_uid(client, duplicate):
-
+def get_metadata_uid(client):
+	"""
+	Create the initial node for the metadata path. Similar to the kmer node this
+	path contains a uid, a edge named "duplicate" and a string camed duplicate.
+	The uid of this node will be connected to the uid of the duplicated kmer.
+	Outwards from this node will be the pervious and next uids in the path.
+	:param client: the dgraph client
+	"""
+	duplicate = "duplicate"
 	bulk_quads.append('_:{0} <duplicate> "{0}" .{1}'.format(duplicate, "\n"))
 
 	txn = client.txn()
@@ -650,8 +664,6 @@ def create_graph(client, file, filepath):
 		x = 0
 		filename = file.name
 		genome = "genome_" + commandline.compute_hash(filepath)
-		dgraph.add_metadata_to_schema(client, "next")
-		dgraph.add_metadata_to_schema(client, "previous")
 		dgraph.add_genome_to_schema(client, genome)
 		all_kmers = dgraph.get_kmers_files(filename, 11)
 
