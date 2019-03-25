@@ -10,11 +10,6 @@ def add_metadata_to_schema(client, genome):
 	:param client: the dgraph client
 	:param genome: the name of the genome which contains a duplicate kmer
 	"""
-	schema = """
-	{0}: uid .
-	""".format(genome)
-
-	client.alter(pydgraph.Operation(schema=schema))
 
 	schema = """
 	duplicate: string @index(exact, term) .
@@ -72,12 +67,10 @@ def add_metadata(client, kmer_uid_dict, duplicates, genome):
 	add_metadata_to_schema(client, genome)
 	print("after addition to schema")
 	bulk_quads = []
-
-	#for i in range(0, len(duplicates)):
-		#print("running", i)
+	metadata_uid = get_metadata_uid(client)
 	bulk_quads.append('<{0}> <{1}> <{2}> .{3}'.format(kmer_uid_dict[duplicates[0]],
 														  genome,
-														  get_metadata_uid(client),
+														  metadata_uid,
 														  "\n"
 													  ))
 
@@ -91,6 +84,7 @@ def add_metadata(client, kmer_uid_dict, duplicates, genome):
 	finally:
 		txn.discard()
 
+	return metadata_uid
 
 def get_metadata_uid(client):
 	"""
@@ -120,6 +114,7 @@ def get_metadata_uid(client):
 def connect_prev_next(client, duplicates, genome):
 	kmer = duplicates[0]
 	prev, next = get_next_prev_uid(client, kmer, genome)
+	print(prev, next)
 	bulk_quads = []
 	bulk_quads.append('<{0}> <{1}> <{2}> .{3}'.format(prev, "next", next, "\n"))
 
@@ -133,15 +128,13 @@ def connect_prev_next(client, duplicates, genome):
 	finally:
 		txn.discard()
 
+	return prev
 
-def connect_metadata_to_path(client):
+def connect_metadata_to_path(client, metadata_uid, prev_uid):
 
 	bulk_quads = []
-	bulk_quads.append('<{0}> <{1}> <{2}> .{3}'.format(kmer_uid_dict[duplicates[0]],
-														  "prev",
-														  get_metadata_uid(client),
-														  "\n"
-													  ))
+	print(prev_uid)
+	bulk_quads.append('<{0}> <{1}> <{2}> .{3}'.format(metadata_uid, "prev", prev_uid, "\n"))
 
 	# Start the transaction
 	txn = client.txn()
@@ -158,14 +151,27 @@ def get_next_prev_uid(client, kmer, genome):
 	print("get_next_prev_uid")
 	query = """
 	{{
-		prev(func: allofterms(kmer, {0})){{
+		genome(func: allofterms(kmer, {0})){{
 	    {1}{{
-			uid
-		}}
+	      uid
+	      duplicate
+	    }}
+	    ~{1}{{
+	    	uid
+	    	duplicate
+	  	}}
 	  }}
 	}}
 	""".format(kmer, genome)
 
 	res = client.query(query)
 	p_res = json.loads(res.json)
-	print(p_res)
+
+	if p_res["genome"][0][genome][1]['duplicate'] == 'duplicate':
+		next = p_res["genome"][0][genome][0]['uid']
+	else:
+		next = p_res["genome"][0][genome][1]['uid']
+
+	prev = p_res["genome"][0]['~'+genome][0]['uid']
+
+	return prev, next
