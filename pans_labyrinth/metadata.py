@@ -12,12 +12,6 @@ def add_metadata_to_schema(client, genome):
 	"""
 
 	schema = """
-	duplicate: string @index(exact, term) .
-	"""
-
-	client.alter(pydgraph.Operation(schema=schema))
-
-	schema = """
 	prev: uid .
 	"""
 
@@ -63,9 +57,8 @@ def add_metadata(client, kmer_uid_dict, duplicates, genome):
 	:param duplicates: a list of duplicated kmers in a contig
 	:param genome: the genome edge name that the kmers belong to
 	"""
-	print("before addition to schema")
+	print("addition to schema")
 	add_metadata_to_schema(client, genome)
-	print("after addition to schema")
 	bulk_quads = []
 	metadata_uid = get_metadata_uid(client)
 	bulk_quads.append('<{0}> <{1}> <{2}> .{3}'.format(kmer_uid_dict[duplicates[0]],
@@ -105,18 +98,20 @@ def get_metadata_uid(client):
 		txn.commit()
 		for uid in m.uids:
 			metadata_uid = m.uids[uid]
+		print("metadata_uid", metadata_uid)
 
 	finally:
 		txn.discard()
 
 	return metadata_uid
 
-def connect_prev_next(client, duplicates, genome):
+def connect_prev(client, duplicates, genome, metadata_uid):
+	print("getting prev uid")
 	kmer = duplicates[0]
 	prev, next = get_next_prev_uid(client, kmer, genome)
 	print(prev, next)
 	bulk_quads = []
-	bulk_quads.append('<{0}> <{1}> <{2}> .{3}'.format(prev, "next", next, "\n"))
+	bulk_quads.append('<{0}> <{1}> <{2}> .{3}'.format(metadata_uid, "prev", prev, "\n"))
 
 	# Start the transaction
 	txn = client.txn()
@@ -128,13 +123,14 @@ def connect_prev_next(client, duplicates, genome):
 	finally:
 		txn.discard()
 
-	return prev
 
-def connect_metadata_to_path(client, metadata_uid, prev_uid):
-
+def connect_next(client, duplicates, genome, metadata_uid):
+	print("geting next uid")
+	kmer = duplicates[0]
+	prev, next = get_next_prev_uid(client, kmer, genome)
+	print(prev, next)
 	bulk_quads = []
-	print(prev_uid)
-	bulk_quads.append('<{0}> <{1}> <{2}> .{3}'.format(metadata_uid, "prev", prev_uid, "\n"))
+	bulk_quads.append('<{0}> <{1}> <{2}> .{3}'.format(metadata_uid, "next", next, "\n"))
 
 	# Start the transaction
 	txn = client.txn()

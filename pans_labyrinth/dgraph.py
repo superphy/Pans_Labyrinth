@@ -345,10 +345,11 @@ def get_kmers_contig(ckmers, client, genome):
 	# Creates a list of quads that need to be added later
 	print('.', end='')
 	add_edges_kmers(client, ckmers, kmer_uid_dict, genome)
+
 	duplicates.append("ATTAAAACGTA")
 	metadata_uid = metadata.add_metadata(client, kmer_uid_dict, duplicates, genome)
-	prev_uid = metadata.connect_prev_next(client, duplicates, genome)
-	metadata.connect_metadata_to_path(client, metadata_uid, prev_uid)
+	metadata.connect_prev(client, duplicates, genome, metadata_uid)
+	metadata.connect_next(client, duplicates, genome, metadata_uid)
 
 def add_edges_kmers(client, kmers, kmer_uid_dict, genome):
 	"""
