@@ -24,6 +24,7 @@ from pans_labyrinth import files, dgraph, commandline, logging_functions, metada
 import sys
 import logging
 import os
+import traceback
 
 output_directory = os.path.abspath("data/logger")
 LOG = logging_functions.create_logger()
@@ -331,7 +332,7 @@ def get_kmers_contig(ckmers, client, genome):
 	duplicates = []
 	for kmer in ckmers:
 		if kmer in kmer_uid_dict:
-			duplicates.append(kmer)
+			duplicates.append(kmer) # convert to a tuple
 		else:
 			kmers_to_insert.append(kmer)
 
@@ -347,9 +348,7 @@ def get_kmers_contig(ckmers, client, genome):
 	add_edges_kmers(client, ckmers, kmer_uid_dict, genome)
 
 	duplicates.append("ATTAAAACGTA")
-	metadata_uid = metadata.add_metadata(client, kmer_uid_dict, duplicates, genome)
-	metadata.connect_prev(client, duplicates, genome, metadata_uid)
-	metadata.connect_next(client, duplicates, genome, metadata_uid)
+	metadata.add_metadata(client, kmer_uid_dict, duplicates, genome, ckmers)
 
 def add_edges_kmers(client, kmers, kmer_uid_dict, genome):
 	"""
@@ -593,5 +592,6 @@ def create_graph(client, file, filepath):
 		sg1 = path_query(client, genome)
 		#print(sg1)
 	except Exception as e:
-		LOG.critical("Failed to create graph at file - {}".format(filename) + str(e))
+		LOG.critical("Failed to create graph at file - {}".format(filename) + str(e)
+		+ traceback.format_exc())
 		sys.exit()

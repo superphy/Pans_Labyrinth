@@ -24,31 +24,7 @@ def add_metadata_to_schema(client, genome):
 	client.alter(pydgraph.Operation(schema=schema))
 
 
-def metadata_query(client, genome, uid):
-	"""
-	This function queries a uid which is known to have metadata associated with it
-	:param client: the dgrpah client
-	:param genome: the genome on the uid which you want the metadata for. Will contain
-	information about the next and previous uids in the path
-	:param uid: the uid of the node in which to look at
-	"""
-	query = """
-	{{
-	  metadata(func: uid({0})){{
-		{1}{{
-		  expand(_all_)
-		}}
-	  }}
-	}}
-	""".format(uid, genome)
-
-	res = client.query(query)
-	p_res = json.loads(res.json)
-
-	print(p_res)
-
-
-def add_metadata(client, kmer_uid_dict, duplicates, genome):
+def add_metadata(client, kmer_uid_dict, duplicates, genome, ckmers):
 	"""
 	Bulk insert of duplicated kmers metadata. Connect the uid of the kmer that exists in the graph
 	with the uid created by the metadata node. These uids are connected along a genome name edge
@@ -60,26 +36,17 @@ def add_metadata(client, kmer_uid_dict, duplicates, genome):
 	print("addition to schema")
 	add_metadata_to_schema(client, genome)
 	bulk_quads = []
-	metadata_uid = get_metadata_uid(client)
-	bulk_quads.append('<{0}> <{1}> <{2}> .{3}'.format(kmer_uid_dict[duplicates[0]],
-														  genome,
-														  metadata_uid,
-														  "\n"
-													  ))
+	kmer = duplicates[0]
 
-	# Start the transaction
-	txn = client.txn()
+	metadata_uid = get_metadata_uid(client, kmer_uid_dict[kmer])
+	duplicate_uid = create_multi_duplicate_edge(client, metadata_uid, kmer)
 
-	try:
-		m = txn.mutate(set_nquads=''.join(bulk_quads))
-		txn.commit()
+	index = ckmers.index(kmer)
 
-	finally:
-		txn.discard()
+	connect_prev(client, duplicate_uid, kmer_uid_dict[ckmers[index -1]])
+	connect_next(client, duplicate_uid, kmer_uid_dict[ckmers[index + 1]])
 
-	return metadata_uid
-
-def get_metadata_uid(client):
+def get_metadata_uid(client, kmer_uid):
 	"""
 	Create the initial node for the metadata path. Similar to the kmer node this
 	path contains a uid, a edge named "duplicate" and a string called duplicate.
@@ -87,10 +54,9 @@ def get_metadata_uid(client):
 	Outwards from this node will be the pervious and next uids in the path.
 	:param client: the dgraph client
 	"""
-	duplicate = "duplicate"
 	bulk_quads = []
 	print("getting uid")
-	bulk_quads.append('_:{0} <duplicate> "{0}" .{1}'.format(duplicate, "\n"))
+	bulk_quads.append('<{0}> <duplicate> _:{1} .{2}'.format(kmer_uid, "duplicate", "\n"))
 	txn = client.txn()
 
 	try:
@@ -105,11 +71,8 @@ def get_metadata_uid(client):
 
 	return metadata_uid
 
-def connect_prev(client, duplicates, genome, metadata_uid):
-	print("getting prev uid")
-	kmer = duplicates[0]
-	prev, next = get_next_prev_uid(client, kmer, genome)
-	print(prev, next)
+def connect_prev(client, metadata_uid, prev):
+	print("getting prev uid", prev)
 	bulk_quads = []
 	bulk_quads.append('<{0}> <{1}> <{2}> .{3}'.format(metadata_uid, "prev", prev, "\n"))
 
@@ -124,11 +87,8 @@ def connect_prev(client, duplicates, genome, metadata_uid):
 		txn.discard()
 
 
-def connect_next(client, duplicates, genome, metadata_uid):
-	print("geting next uid")
-	kmer = duplicates[0]
-	prev, next = get_next_prev_uid(client, kmer, genome)
-	print(prev, next)
+def connect_next(client, metadata_uid, next):
+	print("geting next uid", next)
 	bulk_quads = []
 	bulk_quads.append('<{0}> <{1}> <{2}> .{3}'.format(metadata_uid, "next", next, "\n"))
 
@@ -142,32 +102,42 @@ def connect_next(client, duplicates, genome, metadata_uid):
 	finally:
 		txn.discard()
 
+def create_multi_duplicate_edge(client, metadata_uid, kmer):
 
-def get_next_prev_uid(client, kmer, genome):
-	print("get_next_prev_uid")
+	print("getting duplicate uid")
+	number = duplicate_query(client, kmer)
+	bulk_quads = []
+
+	bulk_quads.append('<{0}> <{1}> _:{1} .{2}'.format(metadata_uid, number, "\n"))
+	txn = client.txn()
+
+	try:
+		m = txn.mutate(set_nquads=''.join(bulk_quads))
+		txn.commit()
+		for uid in m.uids:
+			metadata_uid = m.uids[uid]
+		print("metadata_uid", metadata_uid)
+
+	finally:
+		txn.discard()
+
+	return metadata_uid
+
+def duplicate_query(client, kmer):
+	print("duplicate query")
+
 	query = """
 	{{
-		genome(func: allofterms(kmer, {0})){{
-	    {1}{{
-	      uid
-	      duplicate
-	    }}
-	    ~{1}{{
-	    	uid
-	    	duplicate
-	  	}}
+	  duplicate(func: allofterms(kmer, "{0}")){{
+	    duplicate{{
+			number
+		}}
 	  }}
 	}}
-	""".format(kmer, genome)
+	""".format(kmer)
 
 	res = client.query(query)
-	p_res = json.loads(res.json)
+	path_res = json.loads(res.json)
 
-	if p_res["genome"][0][genome][1]['duplicate'] == 'duplicate':
-		next = p_res["genome"][0][genome][0]['uid']
-	else:
-		next = p_res["genome"][0][genome][1]['uid']
-
-	prev = p_res["genome"][0]['~'+genome][0]['uid']
-
-	return prev, next
+	if "number" not in path_res:
+		return "zero"
