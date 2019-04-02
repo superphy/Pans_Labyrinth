@@ -24,7 +24,7 @@ def add_metadata_to_schema(client, genome):
 	client.alter(pydgraph.Operation(schema=schema))
 
 
-def add_metadata(client, kmer_uid_dict, duplicates, genome, ckmers):
+def add_metadata(client, kmer_uid_dict, kmer_list, genome, ckmers):
 	"""
 	Bulk insert of duplicated kmers metadata. Connect the uid of the kmer that exists in the graph
 	with the uid created by the metadata node. These uids are connected along a genome name edge
@@ -36,15 +36,14 @@ def add_metadata(client, kmer_uid_dict, duplicates, genome, ckmers):
 	print("addition to schema")
 	add_metadata_to_schema(client, genome)
 	bulk_quads = []
-	kmer = duplicates[0]
+	kmer = kmer_list[0][1]
 
 	metadata_uid = get_metadata_uid(client, kmer_uid_dict[kmer])
-	duplicate_uid = create_multi_duplicate_edge(client, metadata_uid, kmer)
+	duplicate_uid = create_duplicate_edge(client, metadata_uid, kmer)
 
-	index = ckmers.index(kmer)
-
-	connect_prev(client, duplicate_uid, kmer_uid_dict[ckmers[index -1]])
-	connect_next(client, duplicate_uid, kmer_uid_dict[ckmers[index + 1]])
+	for x in range(0, len(kmer_list)):
+		connect_prev(client, duplicate_uid, kmer_uid_dict[kmer_list[x][0]])
+		connect_next(client, duplicate_uid, kmer_uid_dict[kmer_list[x][2]])
 
 def get_metadata_uid(client, kmer_uid):
 	"""
@@ -72,6 +71,13 @@ def get_metadata_uid(client, kmer_uid):
 	return metadata_uid
 
 def connect_prev(client, metadata_uid, prev):
+	"""
+	Connects the duplicated kmers previous kmer to the duplicate edge. Creates
+	the previous edge so that a path can be followed from the duplicated kmer.
+	:param client: The dgraph client
+	:param metadata_uid: The uid of the duplicate edge duplicate -> duplicate_1(metadata_uid) -> prev
+	:param prev: The uid of the duplicated kmers previous kmer
+	"""
 	print("getting prev uid", prev)
 	bulk_quads = []
 	bulk_quads.append('<{0}> <{1}> <{2}> .{3}'.format(metadata_uid, "prev", prev, "\n"))
@@ -88,6 +94,14 @@ def connect_prev(client, metadata_uid, prev):
 
 
 def connect_next(client, metadata_uid, next):
+	"""
+	Connects the duplicated kmers next kmer to the duplicate edge. Creates
+	the next edge so that a path can be followed from the duplicated kmer.
+	:param client: The dgraph client
+	:param metadata_uid: The uid of the duplicate edge duplicate -> duplicate_1(metadata_uid) -> next
+	:param prev: The uid of the duplicated kmers next kmer
+	"""
+
 	print("geting next uid", next)
 	bulk_quads = []
 	bulk_quads.append('<{0}> <{1}> <{2}> .{3}'.format(metadata_uid, "next", next, "\n"))
@@ -102,8 +116,17 @@ def connect_next(client, metadata_uid, next):
 	finally:
 		txn.discard()
 
-def create_multi_duplicate_edge(client, metadata_uid, kmer):
+def create_duplicate_edge(client, metadata_uid, kmer):
+	"""
+	Creates the edge which comes off of the initial duplicate edge.
+	duplicate -> duplicate_1
+	The number is based off of how many times the kmer is duplicated and creats
+	separate edges for all of its respective paths.
+	:param client: the dgraph client
+	:param metadata_uid: the uid which connects to the duplicated kmer
+	:param kmer: the duplicated kmer 
 
+	"""
 	print("getting duplicate uid")
 	number = duplicate_query(client, kmer)
 	bulk_quads = []
@@ -124,6 +147,11 @@ def create_multi_duplicate_edge(client, metadata_uid, kmer):
 	return metadata_uid
 
 def duplicate_query(client, kmer):
+	"""
+	Queries to see if a duplicates edge already exists
+	:param client: the dgraph client
+	:param kmer: the duplicated kmer to search for
+	"""
 	print("duplicate query")
 
 	query = """
@@ -140,4 +168,6 @@ def duplicate_query(client, kmer):
 	path_res = json.loads(res.json)
 
 	if "number" not in path_res:
-		return "zero"
+		return "duplicate_1"
+	else:
+		return "duplicate_" + number

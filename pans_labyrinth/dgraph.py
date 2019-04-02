@@ -25,6 +25,7 @@ import sys
 import logging
 import os
 import traceback
+from collections import Counter
 
 output_directory = os.path.abspath("data/logger")
 LOG = logging_functions.create_logger()
@@ -336,6 +337,19 @@ def get_kmers_contig(ckmers, client, genome):
 		else:
 			kmers_to_insert.append(kmer)
 
+	duplicate_list = []
+	kmers = Counter(kmers_to_insert)
+	duplicate_list.append([i for i in kmers if kmers[i]>1])
+	#print(duplicate_list)
+
+	x = 0
+	kmer_list = []
+	while x < len(ckmers):
+		if duplicate_list[0][0] == ckmers[x]:
+			kmer_list.append([ckmers[x - 1], ckmers[x], ckmers[x + 1]])
+		x += 1
+	#print(kmer_list)
+
 	if kmers_to_insert:
 		# Bulk insert the kmers
 		txn_result_dict = add_kmers_batch_dgraph(client, kmers_to_insert)
@@ -347,8 +361,9 @@ def get_kmers_contig(ckmers, client, genome):
 	print('.', end='')
 	add_edges_kmers(client, ckmers, kmer_uid_dict, genome)
 
-	duplicates.append("ATTAAAACGTA")
-	metadata.add_metadata(client, kmer_uid_dict, duplicates, genome, ckmers)
+	metadata.add_metadata(client, kmer_uid_dict, kmer_list, genome, ckmers)
+
+
 
 def add_edges_kmers(client, kmers, kmer_uid_dict, genome):
 	"""
@@ -589,7 +604,7 @@ def create_graph(client, file, filepath):
 			else:
 				kmer = x["kmer"]
 				kmer_list.append(kmer)
-		sg1 = path_query(client, genome)
+		#sg1 = path_query(client, genome)
 		#print(sg1)
 	except Exception as e:
 		LOG.critical("Failed to create graph at file - {}".format(filename) + str(e)
