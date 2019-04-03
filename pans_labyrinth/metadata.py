@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+# Author: Gates Kempenaar
+
 import pydgraph
 import json
 
@@ -36,14 +38,12 @@ def add_metadata(client, kmer_uid_dict, kmer_list, genome, ckmers):
 	print("addition to schema")
 	add_metadata_to_schema(client, genome)
 	bulk_quads = []
-	kmer = kmer_list[0][1]
-
-	metadata_uid = get_metadata_uid(client, kmer_uid_dict[kmer])
-	duplicate_uid = create_duplicate_edge(client, metadata_uid, kmer)
 
 	for x in range(0, len(kmer_list)):
-		connect_prev(client, duplicate_uid, kmer_uid_dict[kmer_list[x][0]])
-		connect_next(client, duplicate_uid, kmer_uid_dict[kmer_list[x][2]])
+		kmer = kmer_list[x][1]
+		metadata_uid = get_metadata_uid(client, kmer_uid_dict[kmer])
+		connect_prev(client, metadata_uid, kmer_uid_dict[kmer_list[x][0]])
+		connect_next(client, metadata_uid, kmer_uid_dict[kmer_list[x][2]])
 
 def get_metadata_uid(client, kmer_uid):
 	"""
@@ -124,14 +124,13 @@ def create_duplicate_edge(client, metadata_uid, kmer):
 	separate edges for all of its respective paths.
 	:param client: the dgraph client
 	:param metadata_uid: the uid which connects to the duplicated kmer
-	:param kmer: the duplicated kmer 
+	:param kmer: the duplicated kmer
 
 	"""
 	print("getting duplicate uid")
-	number = duplicate_query(client, kmer)
 	bulk_quads = []
 
-	bulk_quads.append('<{0}> <{1}> _:{1} .{2}'.format(metadata_uid, number, "\n"))
+	bulk_quads.append('<{0}> <{1}> _:{1} .{2}'.format(metadata_uid, "duplicate", "\n"))
 	txn = client.txn()
 
 	try:
@@ -145,29 +144,3 @@ def create_duplicate_edge(client, metadata_uid, kmer):
 		txn.discard()
 
 	return metadata_uid
-
-def duplicate_query(client, kmer):
-	"""
-	Queries to see if a duplicates edge already exists
-	:param client: the dgraph client
-	:param kmer: the duplicated kmer to search for
-	"""
-	print("duplicate query")
-
-	query = """
-	{{
-	  duplicate(func: allofterms(kmer, "{0}")){{
-	    duplicate{{
-			number
-		}}
-	  }}
-	}}
-	""".format(kmer)
-
-	res = client.query(query)
-	path_res = json.loads(res.json)
-
-	if "number" not in path_res:
-		return "duplicate_1"
-	else:
-		return "duplicate_" + number

@@ -258,7 +258,7 @@ def add_genome_to_schema(client, genome):
 	:return: Altered dgraph
 	"""
 	schema = """
-	{0}: uid @reverse .
+	{0}: uid .
 	""".format(genome)
 
 	return client.alter(pydgraph.Operation(schema=schema))
@@ -328,27 +328,30 @@ def get_kmers_contig(ckmers, client, genome):
 	kmer_uid_dict = {}
 	kmer_uid_dict = add_kmers_dict(kmer_uid_dict, query_kmers_dgraph(client, ckmers))
 
-	# Create list of kmers that need to be batch inserted into graph
-	kmers_to_insert = []
-	duplicates = []
-	for kmer in ckmers:
-		if kmer in kmer_uid_dict:
-			duplicates.append(kmer) # convert to a tuple
-		else:
-			kmers_to_insert.append(kmer)
+	value = check_empty_graph(client)
+
+	kmer_list = []
+	if value == False:
+		# Create list of kmers that need to be batch inserted into graph along
+		# with a list of duplicates.
+		kmers_to_insert = []
+		duplicates = []
+		for kmer in ckmers:
+			if kmer in kmer_uid_dict:
+				index = ckmers.index(kmer)
+				kmer_list.append([ckmers[index - 1], ckmers[index], ckmers[index + 1]])
+			else:
+				kmers_to_insert.append(kmer)
 
 	duplicate_list = []
 	kmers = Counter(kmers_to_insert)
 	duplicate_list.append([i for i in kmers if kmers[i]>1])
-	#print(duplicate_list)
+	print(duplicate_list)
 
-	x = 0
-	kmer_list = []
-	while x < len(ckmers):
-		if duplicate_list[0][0] == ckmers[x]:
-			kmer_list.append([ckmers[x - 1], ckmers[x], ckmers[x + 1]])
-		x += 1
-	#print(kmer_list)
+	for i in range(0, len(duplicate_list)):
+		for x in range(0, len(ckmers)):
+			if duplicate_list[0][i] == ckmers[x]:
+				kmer_list.append([ckmers[x - 1], ckmers[x], ckmers[x + 1]])
 
 	if kmers_to_insert:
 		# Bulk insert the kmers
@@ -363,7 +366,22 @@ def get_kmers_contig(ckmers, client, genome):
 
 	metadata.add_metadata(client, kmer_uid_dict, kmer_list, genome, ckmers)
 
+def check_empty_graph(client):
+	query = """
+	{
+		empty(func: has(kmer)){
+			uid
+		}
+	}
+	"""
 
+	res = client.query(query)
+	p_res = json.loads(res.json)
+
+	if not p_res["empty"]:
+		return False
+	else:
+		return True
 
 def add_edges_kmers(client, kmers, kmer_uid_dict, genome):
 	"""
