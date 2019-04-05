@@ -41,6 +41,7 @@ def add_metadata(client, kmer_uid_dict, kmer_list, genome, ckmers):
 
 	for x in range(0, len(kmer_list)):
 		kmer = kmer_list[x][1]
+		print(kmer_uid_dict[kmer])
 		metadata_uid = get_metadata_uid(client, kmer_uid_dict[kmer])
 		connect_prev(client, metadata_uid, kmer_uid_dict[kmer_list[x][0]])
 		connect_next(client, metadata_uid, kmer_uid_dict[kmer_list[x][2]])

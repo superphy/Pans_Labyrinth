@@ -31,7 +31,6 @@ output_directory = os.path.abspath("data/logger")
 LOG = logging_functions.create_logger()
 fh = logging.FileHandler(os.path.join(output_directory, 'pans_labyrinth.log'), 'w', 'utf-8')
 
-
 def create_client_stub():
 	"""
 	This allows us to create as many stubs as we want easily
@@ -45,7 +44,6 @@ def create_client_stub():
 	except:
 		LOG.critical("Failed to create the client stub")
 
-
 def create_client(client_stub):
 	"""
 	This allows us to create multiple clients easily,
@@ -58,7 +56,6 @@ def create_client(client_stub):
 		return pydgraph.DgraphClient(client_stub)
 	except:
 		LOG.critical("Failed to create client")
-
 
 def drop_all(client):
 	"""
@@ -89,7 +86,6 @@ def add_schema(client):
 	except:
 		LOG.critical("Failed to add schema to graph")
 
-
 def query_kmers_dgraph(client, kmer_list):
 	"""
 	Bulk query a list of kmers and return a dictionary of kmer:uid.
@@ -114,7 +110,6 @@ def query_kmers_dgraph(client, kmer_list):
 		return json_res['find_all']
 	else:
 		return None
-
 
 def example_query(client, genome):
 	"""
@@ -204,12 +199,12 @@ def path_query(client, genome):
 			uid_dict[key] += 1
 		else:
 			uid_dict[key] = 1
-	#print(uid_dict)
+	print(uid_dict)
 
 	for key in uid_dict.keys():
 		if uid_dict[key] == 1:
 			start_stop_list.append(key)
-	#print(start_stop_list)
+	print(start_stop_list)
 
 	first = start_stop_list[0]
 	second = start_stop_list[1]
@@ -244,9 +239,6 @@ def path_query(client, genome):
 
 	return path_res1
 
-
-
-
 def add_genome_to_schema(client, genome):
 	"""
 	Index the genome name as a predicate, so functions can be used on it when searching etc.
@@ -262,7 +254,6 @@ def add_genome_to_schema(client, genome):
 	""".format(genome)
 
 	return client.alter(pydgraph.Operation(schema=schema))
-
 
 def get_kmers_files(filename, kmer_size):
 	"""
@@ -284,7 +275,6 @@ def get_kmers_files(filename, kmer_size):
 				all_kmers[record.id].append(str(record.seq[0 + i:kmer_size + i]))
 	return all_kmers
 
-
 def add_kmers_dict(kmer_dict, kmers):
 	"""
 	Updates a dictionary of kmer:uid.
@@ -298,7 +288,6 @@ def add_kmers_dict(kmer_dict, kmers):
 			kmer_dict[ku['kmer']] = ku['uid']
 
 	return kmer_dict
-
 
 def add_kmers_dgraph(client, all_kmers, genome):
 	"""
@@ -315,7 +304,6 @@ def add_kmers_dgraph(client, all_kmers, genome):
 		kmer_list = kmers[x]
 		get_kmers_contig(kmer_list, client, genome)
 
-
 def get_kmers_contig(ckmers, client, genome):
 	"""
 	Process a single contig into kmers, adding nodes and edges for each
@@ -328,30 +316,26 @@ def get_kmers_contig(ckmers, client, genome):
 	kmer_uid_dict = {}
 	kmer_uid_dict = add_kmers_dict(kmer_uid_dict, query_kmers_dgraph(client, ckmers))
 
-	value = check_empty_graph(client)
-
 	kmer_list = []
-	if value == False:
-		# Create list of kmers that need to be batch inserted into graph along
-		# with a list of duplicates.
-		kmers_to_insert = []
-		duplicates = []
-		for kmer in ckmers:
-			if kmer in kmer_uid_dict:
-				index = ckmers.index(kmer)
-				kmer_list.append([ckmers[index - 1], ckmers[index], ckmers[index + 1]])
-			else:
-				kmers_to_insert.append(kmer)
+	# Create list of kmers that need to be batch inserted into graph
+	kmers_to_insert = []
+	duplicates = []
+	for kmer in ckmers:
+		if kmer not in kmer_uid_dict:
+			kmers_to_insert.append(kmer)
 
+	# Create a list of kmers that are duplicated in a contig
 	duplicate_list = []
-	kmers = Counter(kmers_to_insert)
+	kmers = Counter(ckmers)
 	duplicate_list.append([i for i in kmers if kmers[i]>1])
-	print(duplicate_list)
 
-	for i in range(0, len(duplicate_list)):
-		for x in range(0, len(ckmers)):
-			if duplicate_list[0][i] == ckmers[x]:
-				kmer_list.append([ckmers[x - 1], ckmers[x], ckmers[x + 1]])
+	# Create a list of lists for duplicated kmers that need metadata
+	if duplicate_list[0]:
+		for i in range(0, len(duplicate_list)):
+			for x in range(0, len(ckmers)):
+				if duplicate_list[0][i] == ckmers[x]:
+					kmer_list.append([ckmers[x - 1], ckmers[x], ckmers[x + 1]])
+
 
 	if kmers_to_insert:
 		# Bulk insert the kmers
@@ -364,24 +348,9 @@ def get_kmers_contig(ckmers, client, genome):
 	print('.', end='')
 	add_edges_kmers(client, ckmers, kmer_uid_dict, genome)
 
-	metadata.add_metadata(client, kmer_uid_dict, kmer_list, genome, ckmers)
-
-def check_empty_graph(client):
-	query = """
-	{
-		empty(func: has(kmer)){
-			uid
-		}
-	}
-	"""
-
-	res = client.query(query)
-	p_res = json.loads(res.json)
-
-	if not p_res["empty"]:
-		return False
-	else:
-		return True
+	print(kmer_list)
+	if kmer_list:
+		metadata.add_metadata(client, kmer_uid_dict, kmer_list, genome, ckmers)
 
 def add_edges_kmers(client, kmers, kmer_uid_dict, genome):
 	"""
@@ -415,7 +384,6 @@ def add_edges_kmers(client, kmers, kmer_uid_dict, genome):
 
 	finally:
 		txn.discard()
-
 
 def add_kmers_batch_dgraph(client, kmer_list):
 	"""
@@ -510,7 +478,6 @@ def kmer_upsert(client, kmer):
 
 	return uid
 
-
 def kmer_query(client, kmer):
 	"""
 	Strictly queries the database for a kmer.
@@ -564,7 +531,6 @@ def insert_genome(client, genomes):
 		all_kmers = kmer_from_file(filename, 11)
 		add_all_kmers_to_graph(client, all_kmers, genome)
 	print("inserted genome(s)")
-
 
 def query_for_genome(client, genomes):
 	"""
@@ -622,8 +588,8 @@ def create_graph(client, file, filepath):
 			else:
 				kmer = x["kmer"]
 				kmer_list.append(kmer)
-		#sg1 = path_query(client, genome)
-		#print(sg1)
+		sg1 = path_query(client, genome)
+		print(sg1)
 	except Exception as e:
 		LOG.critical("Failed to create graph at file - {}".format(filename) + str(e)
 		+ traceback.format_exc())
