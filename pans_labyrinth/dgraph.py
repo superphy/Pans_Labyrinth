@@ -199,12 +199,12 @@ def path_query(client, genome):
 			uid_dict[key] += 1
 		else:
 			uid_dict[key] = 1
-	print(uid_dict)
+	#print(uid_dict)
 
 	for key in uid_dict.keys():
 		if uid_dict[key] == 1:
 			start_stop_list.append(key)
-	print(start_stop_list)
+	#print(start_stop_list)
 
 	first = start_stop_list[0]
 	second = start_stop_list[1]
@@ -323,6 +323,8 @@ def get_kmers_contig(ckmers, client, genome):
 	for kmer in ckmers:
 		if kmer not in kmer_uid_dict:
 			kmers_to_insert.append(kmer)
+		else:
+			print(kmer)
 
 	# Create a list of kmers that are duplicated in a contig
 	duplicate_list = []
@@ -346,7 +348,7 @@ def get_kmers_contig(ckmers, client, genome):
 	# Batch the connections between the kmers
 	# Creates a list of quads that need to be added later
 	print('.', end='')
-	add_edges_kmers(client, ckmers, kmer_uid_dict, genome)
+	add_edges_kmers(client, kmers_to_insert, kmer_uid_dict, genome)
 
 	print(kmer_list)
 	if kmer_list:
@@ -571,6 +573,7 @@ def create_graph(client, file, filepath):
 		x = 0
 		filename = file.name
 		genome = "genome_" + commandline.compute_hash(filepath)
+		print(genome)
 		dgraph.add_genome_to_schema(client, genome)
 		all_kmers = dgraph.get_kmers_files(filename, 11)
 
@@ -589,8 +592,9 @@ def create_graph(client, file, filepath):
 				kmer = x["kmer"]
 				kmer_list.append(kmer)
 		sg1 = path_query(client, genome)
-		print(sg1)
+		print(sg1["path"])
 	except Exception as e:
-		LOG.critical("Failed to create graph at file - {}".format(filename) + str(e)
+		LOG.critical("Failed to create graph at file - {}".format(filename)
+		+ str(e)
 		+ traceback.format_exc())
 		sys.exit()
