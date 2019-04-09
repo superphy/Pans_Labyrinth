@@ -218,6 +218,7 @@ def path_query(client, genome):
 			start = second
 			stop = first
 
+	print(start, "start", stop, "stop")
 	query1 = """
 	{{
 	 path as shortest(from: {0}, to: {1}){{
@@ -225,6 +226,9 @@ def path_query(client, genome):
 	 }}
 	   path(func: uid(path)){{
 	     kmer
+		 duplicate{{
+		 	_predicate_
+		 }}
 	   }}
 	}}
 	""".format(start, stop, genome)
@@ -234,8 +238,9 @@ def path_query(client, genome):
 
 	kmer_list1 = []
 	for i, x in enumerate(path_res1["path"]):
-		kmer = path_res1["path"][i]["kmer"]
+		kmer = path_res1["path"][i]["duplicate"]["prev"]
 		kmer_list1.append(kmer)
+	print(kmer_list1)
 
 	return path_res1
 
@@ -592,7 +597,9 @@ def create_graph(client, file, filepath):
 				kmer = x["kmer"]
 				kmer_list.append(kmer)
 		sg1 = path_query(client, genome)
-		print(sg1["path"])
+		print(sg1)
+		#for i, x in enumerate(sg1["path"]):
+			#print(sg1["path"][i]["kmer"])
 	except Exception as e:
 		LOG.critical("Failed to create graph at file - {}".format(filename)
 		+ str(e)

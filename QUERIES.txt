@@ -121,3 +121,15 @@ beforehand. This query is utlilized in the path_query function
      kmer
    }
 }
+
+{
+	 path as shortest(from: uid, to: uid){
+	   genome_54a2c918037187247aa01c989d7caaf378778714
+	 }
+	   path(func: uid(path)){
+	     kmer
+      duplicate{
+        _predicate_
+      }
+	   }
+	}
