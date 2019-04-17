@@ -25,6 +25,11 @@ def add_metadata_to_schema(client, genome):
 
 	client.alter(pydgraph.Operation(schema=schema))
 
+	schema = """
+	{0}: string @index(exact, term) .
+	""".format(genome)
+
+	client.alter(pydgraph.Operation(schema=schema))
 
 def add_metadata(client, kmer_uid_dict, kmer_list, genome, ckmers):
 	"""
@@ -41,8 +46,8 @@ def add_metadata(client, kmer_uid_dict, kmer_list, genome, ckmers):
 
 	for x in range(0, len(kmer_list)):
 		kmer = kmer_list[x][1]
-		print(kmer_uid_dict[kmer])
 		metadata_uid = get_metadata_uid(client, kmer_uid_dict[kmer])
+		add_genome_label(client, metadata_uid, genome)
 		connect_prev(client, metadata_uid, kmer_uid_dict[kmer_list[x][0]])
 		connect_next(client, metadata_uid, kmer_uid_dict[kmer_list[x][2]])
 
@@ -70,6 +75,22 @@ def get_metadata_uid(client, kmer_uid):
 		txn.discard()
 
 	return metadata_uid
+
+def add_genome_label(client, metadata_uid, genome):
+	bulk_quads = []
+	print("Adding genome label")
+	bulk_quads.append('<{0}> <genome> "{1}" .{2}'.format(metadata_uid, genome, "\n"))
+	txn = client.txn()
+
+	try:
+		m = txn.mutate(set_nquads=''.join(bulk_quads))
+		txn.commit()
+		for uid in m.uids:
+			metadata_uid = m.uids[uid]
+		print("metadata_uid", metadata_uid)
+
+	finally:
+		txn.discard()
 
 def connect_prev(client, metadata_uid, prev):
 	"""

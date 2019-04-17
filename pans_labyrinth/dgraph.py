@@ -237,10 +237,10 @@ def path_query(client, genome):
 	path_res1 = json.loads(res1.json)
 
 	kmer_list1 = []
-	for i, x in enumerate(path_res1["path"]):
-		kmer = path_res1["path"][i]["duplicate"]["prev"]
-		kmer_list1.append(kmer)
-	print(kmer_list1)
+	#for i, x in enumerate(path_res1["path"]):
+		#kmer = path_res1["path"][i]["duplicate"]["prev"]
+		#kmer_list1.append(kmer)
+	#print(kmer_list1)
 
 	return path_res1
 
@@ -305,6 +305,7 @@ def add_kmers_dgraph(client, all_kmers, genome):
 
 	dict_values = all_kmers.values()
 	kmers = list(dict_values)
+	print(kmers)
 	for x, i in enumerate(kmers):
 		kmer_list = kmers[x]
 		get_kmers_contig(kmer_list, client, genome)
@@ -328,9 +329,7 @@ def get_kmers_contig(ckmers, client, genome):
 	for kmer in ckmers:
 		if kmer not in kmer_uid_dict:
 			kmers_to_insert.append(kmer)
-		else:
-			print(kmer)
-
+	print(kmers_to_insert)
 	# Create a list of kmers that are duplicated in a contig
 	duplicate_list = []
 	kmers = Counter(ckmers)
@@ -343,7 +342,7 @@ def get_kmers_contig(ckmers, client, genome):
 				if duplicate_list[0][i] == ckmers[x]:
 					kmer_list.append([ckmers[x - 1], ckmers[x], ckmers[x + 1]])
 
-
+	print(kmer_list)
 	if kmers_to_insert:
 		# Bulk insert the kmers
 		txn_result_dict = add_kmers_batch_dgraph(client, kmers_to_insert)
@@ -355,8 +354,8 @@ def get_kmers_contig(ckmers, client, genome):
 	print('.', end='')
 	add_edges_kmers(client, kmers_to_insert, kmer_uid_dict, genome)
 
-	print(kmer_list)
 	if kmer_list:
+		print("There is a kmer list")
 		metadata.add_metadata(client, kmer_uid_dict, kmer_list, genome, ckmers)
 
 def add_edges_kmers(client, kmers, kmer_uid_dict, genome):
@@ -584,20 +583,9 @@ def create_graph(client, file, filepath):
 
 		dgraph.add_kmers_dgraph(client, all_kmers, genome)
 		LOG.info("Finished creating the graph")
-		sg1 = dgraph.example_query(client, genome)
-		kmer_list = []
-		for x in sg1:
-			if x == sg1[-1]:
-				dict = sg1[-1]
-				value = list(dict.values())
-				kmer = value[0]
-				last_kmer = kmer[0]
-				kmer_list.append(last_kmer["kmer"])
-			else:
-				kmer = x["kmer"]
-				kmer_list.append(kmer)
+
 		sg1 = path_query(client, genome)
-		print(sg1)
+		#print(sg1)
 		#for i, x in enumerate(sg1["path"]):
 			#print(sg1["path"][i]["kmer"])
 	except Exception as e:
