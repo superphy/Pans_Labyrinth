@@ -12,7 +12,7 @@ def add_metadata_to_schema(client, genome):
 	:param client: the dgraph client
 	:param genome: the name of the genome which contains a duplicate kmer
 	"""
-
+ 
 	schema = """
 	prev: uid .
 	"""

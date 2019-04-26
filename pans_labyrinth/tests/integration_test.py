@@ -32,7 +32,7 @@ def test_query():
 		else:
 			kmer = x["kmer"]
 			kmer_list.append(kmer)
-	print(kmer_list)
+	#print(kmer_list)
 	for i, x in enumerate(kmer_list):
 		assert x == kmers["genome"][i]
 
@@ -121,7 +121,7 @@ def test_verify_contig():
 	for i, x in enumerate(sg1["path"]):
 		kmer = sg1["path"][i]["kmer"]
 		kmer_list.append(kmer)
-	print(kmer_list)
+	#print(kmer_list)
 
 	#Gets the whole first kmer in the list and then the last character of the rest of the kmers in the list
 	#Creates a string representing the contig

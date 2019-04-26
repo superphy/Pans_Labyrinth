@@ -6,4 +6,33 @@ Add schema to graph with client
 Starting to create graph
 Starting to create graph
 Finished creating the graph
-ALL DONE
+Starting to create graph
+Failed to create graph at file - /Users/PteKempenaar/Desktop/Pans_Labyrinth/data/genomes/test/test.fasta<_Rendezvous of RPC that terminated with:
+	status = StatusCode.UNKNOWN
+	details = "Schema change not allowed from scalar to uid or vice versa while there is data for pred: genome_9ef44e28c1bff7a7a5ee295ca094d1db5118b1bf"
+	debug_error_string = "{"created":"@1556246350.558653000","description":"Error received from peer","file":"src/core/lib/surface/call.cc","file_line":1036,"grpc_message":"Schema change not allowed from scalar to uid or vice versa while there is data for pred: genome_9ef44e28c1bff7a7a5ee295ca094d1db5118b1bf","grpc_status":2}"
+>Traceback (most recent call last):
+  File "/Users/PteKempenaar/Desktop/Pans_Labyrinth/pans_labyrinth/dgraph.py", line 584, in create_graph
+    dgraph.add_kmers_dgraph(client, all_kmers, genome)
+  File "/Users/PteKempenaar/Desktop/Pans_Labyrinth/pans_labyrinth/dgraph.py", line 311, in add_kmers_dgraph
+    get_kmers_contig(kmer_list, client, genome)
+  File "/Users/PteKempenaar/Desktop/Pans_Labyrinth/pans_labyrinth/dgraph.py", line 359, in get_kmers_contig
+    metadata.add_metadata(client, kmer_uid_dict, kmer_list, genome, ckmers)
+  File "/Users/PteKempenaar/Desktop/Pans_Labyrinth/pans_labyrinth/metadata.py", line 44, in add_metadata
+    add_metadata_to_schema(client, genome)
+  File "/Users/PteKempenaar/Desktop/Pans_Labyrinth/pans_labyrinth/metadata.py", line 32, in add_metadata_to_schema
+    client.alter(pydgraph.Operation(schema=schema))
+  File "/Users/PteKempenaar/anaconda3/lib/python3.7/site-packages/pydgraph/client.py", line 46, in alter
+    credentials=credentials)
+  File "/Users/PteKempenaar/anaconda3/lib/python3.7/site-packages/pydgraph/client_stub.py", line 42, in alter
+    credentials=credentials)
+  File "/Users/PteKempenaar/anaconda3/lib/python3.7/site-packages/grpc/_channel.py", line 547, in __call__
+    return _end_unary_response_blocking(state, call, False, None)
+  File "/Users/PteKempenaar/anaconda3/lib/python3.7/site-packages/grpc/_channel.py", line 466, in _end_unary_response_blocking
+    raise _Rendezvous(state, None, None, deadline)
+grpc._channel._Rendezvous: <_Rendezvous of RPC that terminated with:
+	status = StatusCode.UNKNOWN
+	details = "Schema change not allowed from scalar to uid or vice versa while there is data for pred: genome_9ef44e28c1bff7a7a5ee295ca094d1db5118b1bf"
+	debug_error_string = "{"created":"@1556246350.558653000","description":"Error received from peer","file":"src/core/lib/surface/call.cc","file_line":1036,"grpc_message":"Schema change not allowed from scalar to uid or vice versa while there is data for pred: genome_9ef44e28c1bff7a7a5ee295ca094d1db5118b1bf","grpc_status":2}"
+>
+
